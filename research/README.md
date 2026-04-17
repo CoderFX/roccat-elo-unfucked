@@ -32,16 +32,15 @@ re-spin that requires independent protocol documentation.
 | Dongle identity confirmation   | Complete             | Confirmed `26CE:0A0B` via unplug test (F-010)                    |
 | Scope determination            | Complete             | `26CE:01A2` is out of scope; protocol RE from scratch (F-011)    |
 | Known defect characterization  | Complete             | Population-level reliability defect documented (F-012)                    |
-| DFU mode characterization      | **Complete**         | "Crashes" are DFU mode entries; report ID 0x06 = DFU trigger (F-026)     |
-| Swarm analysis                 | Complete             | Swarm cannot detect `26CE:0A0B`; DLL strings reveal full DFU flow (F-017–F-019, F-026) |
-| Dongle recovery                | **RESOLVED**         | Button-hold on plug-in reliably recovers from any crash state (F-029, Q-008)     |
+| DFU mode characterization      | Complete             | DFU is radio-only; commands 0x06/0x07; Neon protocol; DFU PID = `1E7D:3A36` (F-026, F-037, F-039) |
+| Swarm / DLL analysis           | Complete             | settings.xml decoded; 9 protocols; flash packet 520B; VID change deliberate (F-037–F-039, F-041) |
+| Dongle recovery                | **RESOLVED**         | Button-hold on plug-in reliably recovers from any crash state (F-029)            |
 | LED state mapping              | Partial              | 4 states catalogued; pink/magenta meaning unconfirmed (F-030)                    |
-| RF pairing                     | **Blocked**          | Pairing fails in all observed modes; HID silent without RF link (F-031, Q-012)   |
-| USB DFU bootloader             | CLOSED               | No USB bootloader exists; DFU is 2.4 GHz radio-only (F-032, Q-011)              |
-| Headset USB data path          | Complete             | USB-C is charge-only; no data; headset FW updates via RF only (F-034)           |
-| Red-blink mode characterisation| Complete             | HID output disabled (error 31); safe for USB experimentation; radio-active (F-033) |
+| USB DFU bootloader             | CLOSED               | No USB bootloader; DFU is 2.4 GHz radio-only (F-032)                            |
+| Headset USB data path          | Complete             | USB-C charge-only; no data; headset FW updates via RF only (F-034)              |
+| Red-blink mode characterisation| Complete             | HID output disabled (error 31); safe for USB experimentation (F-033)            |
+| CDN firmware acquisition       | **CLOSED**           | Hardware CDN decommissioned; all endpoints 404 (F-040); community/JTAG remain   |
 | RF pairing                     | **Blocked**          | All modes fail; HID gated on RF link; app-mode + button-press attempt pending (Q-012) |
-| Firmware binary acquisition    | In progress          | CDN URL confirmed; module ID unknown; needed for RF stack reflash (Q-010)        |
 | HID command format             | Blocked              | Gated on RF pairing (Q-012); report ID `0x06` = DFU trigger (F-026)             |
 | Battery reporting              | Not started          | Blocked on app-mode command format (Q-003)                                 |
 | Audio control event monitoring | Not started          | Q-006 — elevated priority                                                  |
@@ -55,31 +54,36 @@ LED changes to blinking red; device fully enumerates as `26CE:0A0B`. This works 
 observed failure state including the F-027 deep non-enumeration. Procedure is repeatable
 and confirmed.
 
-**Current blocker — RF pairing (Q-012):** No RF link between headset and dongle has been
-established in any tested mode. HID Interface 6 is silent without an active wireless
-connection. Key constraints now confirmed:
-- Red-blink mode disables the HID output endpoint (`ERROR_GEN_FAILURE`) — it is a
-  wireless-only recovery state, not suitable for HID probing (F-033)
-- Headset USB-C is charge-only — no firmware update or data path via USB (F-034)
-- No USB DFU bootloader exists — DFU is 2.4 GHz radio-only (F-032)
+**Official software recovery paths are exhausted.** The complete failure chain (F-038, F-040):
 
-**Next step — app-mode pairing attempt (Q-012):** Plug dongle normally (solid white),
-put headset into pairing mode, then short-press the dongle button (pink/magenta state,
-F-030). This is the untested most-likely-correct pairing entry sequence.
+```
+Firmware update changes dongle VID: 1E7D:3A37 → 26CE:0A0B
+  → Swarm stops detecting the dongle (looks for 0x1E7D only)
+  → Recovery tool detects it but needs firmware files
+  → Firmware files require Swarm module download
+  → Swarm can't download: device not detected
+  → Roccat decommissions the hardware CDN: all endpoints 404
+  → No official path to obtain firmware or reflash the device
+```
 
-**Parallel — CDN firmware acquisition (Q-010):** The firmware binary is needed to reflash
-the dongle's radio stack if the current firmware is too corrupted to pair. CDN URL pattern
-is known; module ID enumeration is the remaining step.
+**Active blocker — RF pairing (Q-012):** No wireless link established in any tested mode.
+HID Interface 6 is silent without an active RF connection. Next attempt: solid-white (app)
+mode + headset pairing + short button press (pink/magenta, F-030).
+
+**Remaining paths:**
+1. **Community firmware cache** — someone with a pre-update dongle may have `data/3A37/firmware/` cached; worth posting on Roccat forums/Reddit
+2. **JTAG/SWD hardware debug** — open the dongle, access PIC32 or nRF debug pins, read flash directly
+3. **Pre-update replacement dongle** — a unit still presenting as `1E7D:3A37` would work with Swarm normally
 
 ## Documents
 
 | File                  | Contents                                                                        |
 |-----------------------|---------------------------------------------------------------------------------|
 | `README.md`           | This file — overview, status, key findings summary                              |
-| `findings.md`         | Chronological log of all discoveries (F-001 through F-036)                     |
+| `findings.md`         | Chronological log of all discoveries (F-001 through F-041)                     |
 | `usb_descriptor.md`   | Full USB descriptor tables, endpoint map, probe results                         |
 | `protocol_notes.md`   | HID command format, reference Elo 7.1 Air protocol, command hypotheses          |
-| `open_questions.md`   | Open questions (Q-008/Q-009/Q-011 closed; Q-012 active; Q-010 in progress)     |
+| `open_questions.md`   | Open questions (Q-008/Q-009/Q-010/Q-011 closed; Q-012 active)                  |
 
 ## Key Findings Summary
 
@@ -217,6 +221,28 @@ is known; module ID enumeration is the remaining step.
     produces a recovery equivalent of the dongle's button-hold. Headset-side recovery is only
     possible via RF link from a working dongle.
 
+### Session 10 findings (Swarm database decoded; VID change deliberate; CDN dead)
+37. **settings.xml decoded: complete Roccat device database; Elo DFU PID = `1E7D:3A36`**
+    (F-037) — zlib-decompressed (3,212→20,789 bytes); 143 products; Elo Air dongle app PID
+    `0x3A37`, DFU/updating PID `0x3A36`; Elo Air headset app `0x3A39`, DFU `0x3A38`; all
+    use VID `0x1E7D`. The `data/3A37/firmware/` DLL name field confirmed.
+38. **VID `0x26CE` is Savitech (USB audio chip vendor); change was deliberate** (F-038) —
+    appears exactly twice in `firmware_upgrade.dll`, INI-loaded at runtime (not hardcoded
+    like the 61 `0x1E7D` occurrences). Roccat deliberately changed the dongle's VID to the
+    chip vendor's VID in a firmware update, breaking Swarm's device detection.
+39. **`firmware_upgrade.dll` fully analysed** (F-039) — 70 exports; 9 distinct update
+    protocols (PIC32, Neon 0x06/0x07, Holtek ISP, Klassic, Kain 200, PURE OTA BT, Nordic
+    nRF/nrfutil, Khan/CMedia, PXI/Pixart); flash packet = 520 bytes (8B header + 512B data);
+    CRC-16 CCITT (poly `0x1021`) and reflected variant; 7 runtime DLLs identified.
+40. **CDN hardware firmware endpoints decommissioned** (F-040) — `/swarm1/download/hardware/2/{id}`
+    returns 404 for all IDs 1–500+; autoupdate API returns `{"hardware":null,"software":null}`
+    universally; Swarm changelog shows Elo fixes through v1.9427, then dropped. No official
+    firmware acquisition path remains.
+41. **Swarm auto-update log decoded; Elo module ID never transmitted** (F-041) — Swarm logs
+    at `AppData\Roaming\ROCCAT\SWARM\log\Auto_Update\`; only AlienFX (`2713`) appears in
+    software keys; CDN resolves to Hetzner S3 (`nbg1.your-objectstorage.com/tbnb/...`);
+    hardware download path is dead.
+
 ## Related Prior Art
 
 | Project        | File / Path                         | VID covered |
@@ -238,3 +264,4 @@ is known; module ID enumeration is the remaining step.
 | 2026-04-17 | Session 7: New failure mode (F-027) — USB stack not initializing, only LED active; physical reset button found (F-028) — hardware ROM bootloader entry test in progress; Q-008 updated with revised recovery steps |
 | 2026-04-17 | Session 8: Q-008 RESOLVED — button-hold recovery confirmed (F-029); LED state map documented (F-030); RF pairing failure documented (F-031); Q-012 added as new blocker; status table updated |
 | 2026-04-17 | Session 9: No USB DFU bootloader (F-032, Q-011 closed); red-blink characterised as safe/radio-only (F-033, F-035); headset USB charge-only (F-034); headset no recovery mode (F-036); Q-012 updated; end-of-day summary written |
+| 2026-04-18 | Session 10: settings.xml decoded — DFU PID 1E7D:3A36 confirmed (F-037); VID 0x26CE = Savitech, change deliberate (F-038); firmware_upgrade.dll fully analysed — 9 protocols, 520B flash packet (F-039); CDN decommissioned — all hardware endpoints 404 (F-040); Swarm log decoded (F-041); Q-010 CDN path closed; consequence chain documented |

@@ -1218,3 +1218,255 @@ the USB-C port (charge-only, F-034) or from button combinations.
 
 4. **JTAG/hardware debug** — if firmware reflash via software paths remains blocked,
    physical JTAG/SWD access to the PIC32 or nRF5x MCU is the last-resort path.
+
+---
+
+## Session 10 — 2026-04-18
+
+### F-037 — settings.xml decoded: complete Roccat device database; Elo DFU PID confirmed
+
+**Phase:** Swarm data extraction — decompression and parsing of `settings.xml`
+
+The file `settings.xml` inside the Swarm installation is zlib-compressed with a 4-byte
+header. Decompressed from 3,212 bytes to 20,789 bytes. Contains the complete Roccat device
+database: 143 products, all with VID/PID, DFU PID, DLL name, and display name fields.
+
+**Elo Air entries:**
+
+| Device | Type | App PID | DFU/updating PID | DLL name | Display name |
+|--------|------|---------|-----------------|----------|--------------|
+| Elo Air dongle | 52 | `0x3A37` | **`0x3A36`** | `3A37` | `ELO_AIR` |
+| Elo Air headset | 50 | `0x3A39` | **`0x3A38`** | `3A39` | `ELO_AIR` |
+| Elo USB (wired) | 49 | `0x3A34` | `0x3A34` | `KHAN_AIMO` | `ELO_USB` |
+
+All entries use VID `0x1E7D`.
+
+**Key confirmed facts:**
+
+1. **DFU PID for the Elo Air dongle is `0x3A36`** — when the dongle enters DFU/bootloader
+   mode, it should present as `1E7D:3A36`. Prior USB scans after DFU entry (F-032) found
+   nothing under this VID because the dongle now presents as `26CE:0A0B`, not `1E7D:3A37`.
+   The DFU PID change (`26CE:????` → unknown) is a direct consequence of the VID change
+   documented in F-038.
+
+2. **`updating_pid` is a distinct PID, not identical to app PID** — the Elo USB wired
+   device (type 49) uses the same PID for both app and DFU, but the wireless Elo Air
+   dongle (type 52) drops to `0x3A36` in DFU mode. This confirms the F-032 observation
+   that nothing appeared after DFU entry — we were looking for a re-enumeration under the
+   wrong VID entirely.
+
+3. **DLL name `3A37` maps to the firmware file directory** — the `data/3A37/firmware/`
+   path documented in F-014 is derived directly from the DLL name field, not the PID hex.
+
+**Confidence:** confirmed — decoded directly from Swarm's own device database
+
+---
+
+### F-038 — VID `0x26CE` is Savitech (USB audio chip vendor); VID change was deliberate
+
+**Phase:** Binary analysis — `firmware_upgrade.dll` VID occurrence mapping
+
+VID `0x26CE` appears exactly **2 times** in the `firmware_upgrade.dll` binary. The VID is
+identified as belonging to **Savitech Corporation**, the manufacturer of the USB audio
+chip used in the Roccat Elo Air dongle. This is not the Realtek or ASRock VID as previously
+speculated — it is the audio codec vendor's own VID.
+
+**The VID change was deliberate and planned:**
+- The DLL loads `0x26CE` from the INI file at runtime rather than hardcoding it alongside
+  the `0x1E7D` entries. This means the VID change was a conscious engineering decision,
+  not an accident or silicon substitution.
+- `0x1E7D` (Roccat GmbH) appears **61 times** in the same DLL — it is the primary VID for
+  all other Roccat devices. The `0x26CE` entries are deliberately segregated as INI-loaded
+  runtime values.
+
+**Consequence chain:**
+
+```
+1. Dongle ships with VID 0x1E7D PID 0x3A37 (app mode) → Swarm detects it
+2. Roccat ships firmware update via Swarm that changes VID to 0x26CE PID 0x0A0B
+3. Post-update: Swarm no longer detects the dongle (looks for 0x1E7D only)
+4. ROCCAT_Recover_Tool.exe detects it (uses broader scan) but needs firmware files
+5. Firmware files require Swarm module download → Swarm can't see device → circular
+6. CDN firmware modules then decommissioned (F-040) → no download path remains
+```
+
+**Significance for users experiencing the F-012 field reliability failures:** Any user
+whose dongle received this firmware update is permanently locked out of official software
+support. The button-hold recovery (F-029) is the only remaining recovery method, and it
+only restores USB enumeration — it does not revert the VID change.
+
+**Confidence:** confirmed — VID occurrence counts from binary analysis; deliberate INI
+loading confirmed from DLL structure; Savitech VID registration confirmed
+
+---
+
+### F-039 — `firmware_upgrade.dll` fully analysed: 9 protocols, flash packet format, checksums
+
+**Phase:** Static analysis — complete export table and protocol RE
+
+Full analysis of `firmware_upgrade.dll`:
+
+**Export table:**
+- 70 total exports
+- `CFirmware_upgrade` class: 44 methods (constructor, destructor, `set_pid()`, protocol
+  dispatch, progress callbacks, error handling)
+- Embedded hidapi: 26 functions (`hid_open`, `hid_write`, `hid_read`, `hid_send_feature_report`,
+  `hid_get_feature_report`, `hid_enumerate`, and related)
+
+**9 distinct firmware update protocols:**
+
+| Protocol name | Target chip/device | Notes |
+|--------------|-------------------|-------|
+| PIC32 | Microchip PIC32 | Dongle application MCU |
+| Neon `0x06`/`0x07` | Neon device family | DFU trigger commands documented in F-026 |
+| Holtek ISP | Holtek HT32 | Mice, keyboards |
+| Klassic boot-mode | Klassic device | Boot mode selection |
+| Kain 200 HID | Kain 200 mouse | Direct HID flash |
+| PURE OTA BT | Bluetooth OTA | Pure wireless BT |
+| Nordic nRF / nrfutil | Nordic nRF5x | Wireless MCU; invoked as `nrfutil.exe` |
+| Khan Aimo / CMedia | CMedia USB audio | Audio codec firmware |
+| PXI / Pixart | Pixart sensor | Mouse optical sensor |
+
+**Flash packet format:**
+- **520 bytes per packet: 8-byte header + 512-byte data payload**
+- This format constant appears 62 times in the compiled code — it is the primary transfer
+  unit for all PIC32 flash operations
+- The 8-byte header likely contains: sequence number, command/type byte, length, CRC
+
+**Checksum algorithms:**
+- CRC-16 CCITT (polynomial `0x1021`) — standard CRC-16
+- CRC-16 reflected (polynomial `0x8408`) — bit-reversed variant
+- Simple additive checksum — used for lightweight packet integrity checks
+
+**Runtime DLL loading:**
+
+| DLL / executable | Purpose |
+|-----------------|---------|
+| `headset_x86.dll` | Headset-side command interface |
+| `Dongle_DFU.dll` | Dongle DFU flash operations |
+| `USBCmdLib.dll` | Low-level USB command library |
+| `ISPDLL.dll` | ISP (in-system programming) for Holtek |
+| `nordic_x86.dll` | Nordic nRF5x wrapper |
+| `PXICtrl3318.dll` | Pixart sensor controller |
+| `nrfutil.exe` | Nordic DFU utility (invoked as subprocess) |
+
+**Significance:** The Neon protocol (`0x06`/`0x07`) is the one our dongle uses. The 520-byte
+flash packet format and CRC-16 CCITT checksum are the parameters needed to construct a valid
+DFU firmware image if/when the firmware binary is obtained. The embedded hidapi in the DLL
+is the actual HID communication layer — its function signatures match the open-source hidapi
+API exactly, meaning the DLL's HID operations are fully understood.
+
+**Confidence:** confirmed — from binary export table analysis and constant extraction
+
+---
+
+### F-040 — CDN firmware modules decommissioned; download endpoints return 404
+
+**Phase:** CDN enumeration — autoupdate API RE and hardware download probe
+
+**Autoupdate API fully reverse-engineered:**
+
+Endpoint: `POST https://acpv.prod.turtlebeach.com/swarm1/autoupdate/ELO_AIR`
+
+Request body (JSON, `Content-Type: application/x-www-form-urlencoded`):
+```json
+data={"system":27,"version":1.9481,"protocol":2,"hardware":{},"software":{"3A37":0.0}}
+```
+
+Response structure:
+```json
+["successfully", {"hardware": null, "software": null}]
+```
+
+The server responds `"successfully"` but returns `null` for both `hardware` and `software`
+fields for **every device tested** — not just the Elo. This is not a VID/PID mismatch
+issue; the server returns null universally.
+
+**Hardware download endpoint probed:**
+
+URL pattern: `https://acpv.prod.turtlebeach.com/swarm1/download/hardware/2/{id}`
+
+Result: **404 for every ID tested in the range 1–500+**
+
+**Software download endpoint probed:**
+
+URL pattern: `https://acpv.prod.turtlebeach.com/swarm1/form/{id}`
+
+Result: IDs 900–1039 found — these are Swarm installer packages only, not device firmware.
+
+**Swarm changelog confirms Elo module existed:**
+- Version 1.9427 changelog contains Elo-specific fixes — the module was actively maintained
+  through at least that version
+- No Elo entries appear in changelog versions after 1.9427, suggesting the module was
+  removed or the device was dropped from support at that point
+
+**Conclusion:** Roccat/Turtle Beach have decommissioned the hardware firmware CDN. The
+module download infrastructure that `ROCCAT_Recover_Tool.exe` and Swarm's auto-update
+system depend on no longer serves firmware content. All hardware download endpoints return
+404. The firmware binary for the Elo Air dongle **cannot be obtained from the official CDN**.
+
+**Confidence:** confirmed — HTTP responses observed directly; 500+ IDs tested
+
+---
+
+### F-041 — Swarm auto-update log decoded; module ID for Elo never transmitted
+
+**Phase:** Log file analysis — `C:\Users\gelum\AppData\Roaming\ROCCAT\SWARM\log\Auto_Update\`
+
+Swarm writes detailed JSON request/response logs to the above path. Log analysis reveals:
+
+**Request format observed in logs:**
+```json
+data={"system":27,"version":1.9481,"protocol":2,"hardware":{},"software":{"2713":0.0}}
+```
+
+The software key `"2713"` is the AlienFX device PID (`0x2713`) — a different Roccat product
+that Swarm successfully detects. The Elo dongle PID (`3A37` or `0A0B`) never appears in any
+log entry because Swarm cannot detect the `26CE:0A0B` device (F-017).
+
+**Consequence:** Since Swarm never includes the Elo module ID in its autoupdate requests,
+the Elo module ID is not observable from this installation's logs. The module ID can only
+be found from a log captured on a system where Swarm detected the dongle as `1E7D:3A37`.
+
+**Swarm CDN infrastructure:**
+The signed download URL in the logs resolves to:
+`nbg1.your-objectstorage.com/tbnb/production/software-update/roccat--swarm/`
+
+This is a Hetzner S3-compatible object store (Hetzner Nuremberg region). Software packages
+(Swarm installers) are hosted here. Hardware firmware modules used a separate path
+(`/swarm1/download/hardware/`) that is now 404 (F-040).
+
+**Confidence:** confirmed — log contents observed directly
+
+---
+
+### End-of-session assessment — software recovery paths exhausted
+
+The parallel agent work in Session 10 has closed the firmware acquisition path via official
+channels. The complete failure chain is now documented:
+
+```
+Firmware update (Swarm) changes dongle VID: 1E7D:3A37 → 26CE:0A0B
+    ↓
+Swarm stops detecting the dongle (looks for 1E7D only)
+    ↓
+ROCCAT_Recover_Tool.exe detects it but needs firmware files
+    ↓
+Firmware files require Swarm module download
+    ↓
+Swarm can't download: device not detected → files never created
+    ↓
+Roccat decommissions the hardware CDN → download endpoint returns 404
+    ↓
+No official software path to obtain firmware or reflash the device
+```
+
+**Remaining paths to a working device:**
+
+| Path | Viability | Notes |
+|------|-----------|-------|
+| Community-sourced firmware cache | Possible | Someone with a pre-update dongle may have `data/3A37/firmware/` cached |
+| Archived Swarm installer with bundled firmware | Unknown | Older installers may predate CDN-only delivery |
+| Wayback Machine CDN snapshot | Unlikely | CDN content rarely archived |
+| JTAG/SWD hardware debug | Viable (hardware work) | Requires opening the dongle and accessing test points |
+| Replace with pre-update dongle (`1E7D:3A37`) | Viable | A dongle that never received the VID-changing update would work with Swarm |

@@ -5,3 +5,13 @@ __pycache__/
 *.exe
 *.dll
 .claude/settings.local.json
+swarm_extracted/v1.9396_full/
+swarm_extracted/v1.9396_unpacked/
+swarm_extracted/v1.9396_payload/
+swarm_extracted/v1.9478_unpacked/
+swarm_extracted/v1.9481_unpacked/
+swarm_extracted/swarm_ii/
+swarm_extracted/swarm_ii_unpacked/
+swarm_extracted/roccat_swarm_1.9396.zip
+swarm_extracted/roccatswarm.1.9396.nupkg
+swarm_extracted/

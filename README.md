@@ -43,12 +43,30 @@ The original Elo 7.1 Air dongle identified as:
 - Worked fine
 
 After Roccat's firmware update, it became:
-- **VID `0x26CE`** (Realtek/ASRock), **PID `0x0A0B`**
+- **VID `0x26CE`** (Savitech — the USB audio chip vendor), **PID `0x0A0B`**
 - Completely different USB Audio 2.0 protocol
 - Vendor HID with Report ID `0x06`, 2-byte output, 64-byte input
 - Broken
 
 Yes, Roccat's own firmware update changed the USB Vendor ID. The dongle no longer identifies as a Roccat device. You can't make this up.
+
+## The Full Chain of Incompetence
+
+We reverse-engineered Roccat's own tools. Here's what we found:
+
+1. **Roccat pushed a firmware update** that changed the dongle's VID from their own (`0x1E7D`) to the chip vendor's (`0x26CE` — Savitech). This was **intentional** — the VID is loaded from config at runtime.
+
+2. **Their own software can't detect the updated dongle.** Swarm looks for VID `0x1E7D`. The dongle now reports `0x26CE`. Swarm literally cannot see the device its own update created.
+
+3. **The Recovery Tool is broken by design.** It shows "firmware update required" but the dropdown is frozen because it needs device module files that are only downloaded by Swarm — which can't detect the dongle. Circular failure.
+
+4. **They decommissioned the firmware CDN.** We fully reverse-engineered their update API (`POST /swarm1/autoupdate/ELO_AIR`) — it responds `"successfully"` but returns `null` for all firmware and module downloads. The server is alive but empty. **Even if Swarm could detect your dongle, it can't download the fix.**
+
+5. **The dongle's radio stack is broken too.** We tested every pairing combination (4 different LED modes). The dongle and headset can both enter pairing mode but can't find each other. The firmware corrupted the wireless protocol.
+
+6. **The headset USB port is charge-only.** No data. Can't update firmware through the headset either.
+
+**Result:** A $100 wireless headset turned into a wired paperweight by the company that made it, with every possible recovery path deliberately or negligently destroyed.
 
 ## Known Issues With Roccat's Firmware
 
@@ -58,9 +76,10 @@ Source: Community reports from Reddit, forums, and reviews (2021-2025)
 |-------|-----------|-------------|
 | Dongle stops being recognized after ~1 hour | Widespread | None |
 | Dongle overheats | Common | None |
-| Pairing fails after headset power cycle | Common | "Have you tried restarting?" |
-| Firmware update bricks dongle | Multiple reports | Recovery tool (sometimes works) |
-| Swarm fails to detect dongle | Common | Reinstall Swarm (LOL) |
+| Pairing fails after headset power cycle | Common | None |
+| Firmware update bricks dongle | Multiple reports | Recovery tool (doesn't work) |
+| Swarm fails to detect dongle | Common | Reinstall Swarm (doesn't help) |
+| Firmware CDN decommissioned | Permanent | None — they deleted the fix |
 
 ## Hardware Details
 

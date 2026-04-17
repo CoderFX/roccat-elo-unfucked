@@ -207,41 +207,35 @@ hidapi. This is now the primary live-traffic RE path.
 
 ## Q-010 — Can we obtain the Elo firmware binary directly, bypassing Swarm's device detection?
 
-**Status:** open — CDN URL pattern confirmed; module ID is the missing piece (F-024)
-**Priority:** HIGH — needed for Q-008 dongle recovery and for binary analysis
-**Related findings:** F-014, F-017, F-018, F-019, F-023, F-024
+**Status:** CLOSED (official CDN paths) — 2026-04-18; community sourcing still possible
+**Priority:** HIGH for community/hardware paths; official CDN path is dead
+**Related findings:** F-014, F-017, F-018, F-019, F-023, F-024, F-037, F-040, F-041
 
-**Detail:** `ROCCAT_Recover_Tool.exe` can see the dongle (F-018) but stalls because
-`firmware_upgrade.ini` and the firmware binary are absent. The CDN URL pattern is now known
-(F-024): `https://acpv.prod.turtlebeach.com/swarm1/form/<module_id>`. The Elo module ID
-must be resolved — it is an integer key from Swarm's `version.ini`, not the PID directly.
+**Official CDN result (F-040):** The hardware firmware CDN is decommissioned. The endpoint
+`/swarm1/download/hardware/2/{id}` returns 404 for all IDs 1–500+. The autoupdate API
+returns `{"hardware": null, "software": null}` for every device. The Elo module ID is never
+transmitted in Swarm logs on this system because Swarm never detects `26CE:0A0B` (F-041).
+The DFU PID is now known (`1E7D:3A36` per F-037) but irrelevant — the dongle no longer
+presents under VID `0x1E7D` at all.
 
-Swarm II is confirmed as a dead end (F-023) — it carries only Turtle Beach device modules.
+**Remaining acquisition paths (non-CDN):**
 
-**Candidate acquisition methods (updated):**
+1. **Community-sourced firmware cache:** Any user whose dongle received the VID-changing
+   firmware update while running Swarm would have `data/3A37/firmware/` cached locally
+   before the update completed. Sourcing from Roccat forums, Reddit, or Discord is viable.
+   The firmware binary and `firmware_upgrade.ini` are the target files.
 
-1. **Enumerate CDN module IDs:** The `version.ini` section numbers appear to be small
-   integers. Iterating a plausible range (e.g., 1–200) against the CDN endpoint and
-   inspecting responses for Elo-related content may locate the module without needing a
-   `version.ini` that lists the Elo device.
+2. **Archived Swarm installer:** Swarm versions prior to the CDN-only delivery model may
+   have bundled device firmware in the NSIS installer. The Swarm changelog notes Elo fixes
+   through v1.9427 — installers from that era are worth examining.
 
-2. **Extract module ID from a Swarm install that detected `1E7D:3A37`:** Any system where
-   Swarm enumerated the dongle under its original VID:PID would have the Elo module ID in
-   `version.ini` and the firmware binary cached in `data/3A37/firmware/`. Community sourcing
-   (Roccat forums, Reddit) is viable.
+3. **JTAG/SWD firmware readback:** If the dongle is opened and debug pins are accessible,
+   a PIC32 debugger (PICkit, or SWD if nRF handles USB) can read back the flash contents.
+   This bypasses all software paths entirely and yields the binary directly.
 
-3. **Static analysis of `firmware_upgrade.dll` for INI schema:** The DLL may contain enough
-   format strings to reconstruct a valid `firmware_upgrade.ini` manually. Combined with the
-   firmware binary from method 1 or 2, this would feed the recovery tool.
-
-4. **Wayback Machine / archived Swarm installers:** Older installers may bundle firmware or
-   carry a `version.ini` that includes the Elo module ID.
-
-**How to resolve:**
-- Attempt CDN enumeration: iterate `https://acpv.prod.turtlebeach.com/swarm1/form/N`
-  for N in 1–200; inspect HTTP responses for firmware binary signatures
-- Search Roccat community for `data/3A37/firmware/` cache contents
-- Strings-dump `firmware_upgrade.dll` for INI format schema
+4. **Replace with pre-update dongle:** Acquiring a second-hand dongle that never received
+   the VID-changing update (still presents as `1E7D:3A37`) would allow Swarm to detect and
+   update it normally.
 
 ---
 
@@ -325,6 +319,7 @@ Additional constraints confirmed in Session 9:
 | Q-005 | What do `0xA0`–`0xAA` opcodes on `26CE:01A2` control?   | 2026-04-17 (OOS)| F-010   |
 | Q-008 | Is the dongle permanently damaged / how to recover?      | 2026-04-17      | F-029   |
 | Q-009 | Swarm USB traffic capture — viable approach?             | 2026-04-17 (CLOSED) | F-017 |
+| Q-010 | Obtain Elo firmware binary via CDN                       | 2026-04-18 (CLOSED — CDN dead) | F-040 |
 | Q-011 | Identify bootloader-mode VID:PID / enumerate DFU device  | 2026-04-17 (CLOSED) | F-032 |
 
 ---
@@ -343,3 +338,4 @@ Additional constraints confirmed in Session 9:
 | 2026-04-17 | Session 7: Q-008 updated — new failure mode (F-027: USB stack not initializing); hardware button recovery attempt (F-028) added as priority 1 step |
 | 2026-04-17 | Session 8: Q-008 RESOLVED — button-hold recovery confirmed (F-029); Q-012 added (RF pairing failure, new blocker for HID RE) |
 | 2026-04-17 | Session 9: Q-011 CLOSED — no USB bootloader exists; DFU is radio-based (F-032); Q-012 updated with F-033/F-034/F-036 constraints; resolution steps revised |
+| 2026-04-18 | Session 10: Q-010 official CDN path CLOSED — hardware download endpoint 404 (F-040); DFU PID 0x3A36 confirmed from settings.xml (F-037); community/JTAG paths remain open |
