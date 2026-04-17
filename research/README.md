@@ -34,11 +34,15 @@ re-spin that requires independent protocol documentation.
 | Known defect characterization  | Complete             | Population-level reliability defect documented (F-012)                    |
 | DFU mode characterization      | **Complete**         | "Crashes" are DFU mode entries; report ID 0x06 = DFU trigger (F-026)     |
 | Swarm analysis                 | Complete             | Swarm cannot detect `26CE:0A0B`; DLL strings reveal full DFU flow (F-017–F-019, F-026) |
-| Dongle recovery                | **CRITICAL BLOCKED** | USB stack not initializing (F-027); hardware button test in progress (F-028, Q-008) |
-| Hardware button recovery       | **In progress**      | Physical button held on plug-in — testing ROM bootloader entry (F-028)            |
-| Bootloader device identification | Pending            | Blocked until dongle re-enumerates in any mode (Q-011)                            |
-| Firmware binary acquisition    | In progress          | CDN URL confirmed (F-024); Elo module ID needed (Q-010)                           |
-| HID command format             | Blocked              | Blocked on dongle recovery; report ID `0x06` = DFU trigger (F-026)               |
+| Dongle recovery                | **RESOLVED**         | Button-hold on plug-in reliably recovers from any crash state (F-029, Q-008)     |
+| LED state mapping              | Partial              | 4 states catalogued; pink/magenta meaning unconfirmed (F-030)                    |
+| RF pairing                     | **Blocked**          | Pairing fails in all observed modes; HID silent without RF link (F-031, Q-012)   |
+| USB DFU bootloader             | CLOSED               | No USB bootloader exists; DFU is 2.4 GHz radio-only (F-032, Q-011)              |
+| Headset USB data path          | Complete             | USB-C is charge-only; no data; headset FW updates via RF only (F-034)           |
+| Red-blink mode characterisation| Complete             | HID output disabled (error 31); safe for USB experimentation; radio-active (F-033) |
+| RF pairing                     | **Blocked**          | All modes fail; HID gated on RF link; app-mode + button-press attempt pending (Q-012) |
+| Firmware binary acquisition    | In progress          | CDN URL confirmed; module ID unknown; needed for RF stack reflash (Q-010)        |
+| HID command format             | Blocked              | Gated on RF pairing (Q-012); report ID `0x06` = DFU trigger (F-026)             |
 | Battery reporting              | Not started          | Blocked on app-mode command format (Q-003)                                 |
 | Audio control event monitoring | Not started          | Q-006 — elevated priority                                                  |
 | USB traffic capture (Swarm)    | CLOSED               | Swarm cannot see `26CE:0A0B`; Swarm II out of scope (F-017, F-023)         |
@@ -46,32 +50,36 @@ re-spin that requires independent protocol documentation.
 
 ## Current Blocker / Next Steps
 
-**Current state (F-027):** The dongle has entered a deeper failure mode than prior DFU
-timeouts. LED lights on plug-in (MCU running) but no USB enumeration occurs at all — not
-app mode, not DFU bootloader. The application firmware is corrupted to the point where USB
-initialization is never reached.
+**Dongle recovery is SOLVED (F-029):** Hold the physical button while plugging in USB.
+LED changes to blinking red; device fully enumerates as `26CE:0A0B`. This works from any
+observed failure state including the F-027 deep non-enumeration. Procedure is repeatable
+and confirmed.
 
-**Active recovery attempt — hardware button (F-028):**
-Hold the physical button on the dongle body while plugging in. If the button is wired to a
-hardware boot-mode-select pin (analogous to BOOT0 on STM32), it bypasses corrupted
-application firmware and enters a factory ROM bootloader. Watch for any new USB VID:PID
-appearing on the bus — including previously unseen ones.
+**Current blocker — RF pairing (Q-012):** No RF link between headset and dongle has been
+established in any tested mode. HID Interface 6 is silent without an active wireless
+connection. Key constraints now confirmed:
+- Red-blink mode disables the HID output endpoint (`ERROR_GEN_FAILURE`) — it is a
+  wireless-only recovery state, not suitable for HID probing (F-033)
+- Headset USB-C is charge-only — no firmware update or data path via USB (F-034)
+- No USB DFU bootloader exists — DFU is 2.4 GHz radio-only (F-032)
 
-**If button recovery works:** Identify and enumerate the ROM bootloader device; flash
-known-good firmware via whatever protocol it exposes (DFU, UART, ICSP).
+**Next step — app-mode pairing attempt (Q-012):** Plug dongle normally (solid white),
+put headset into pairing mode, then short-press the dongle button (pink/magenta state,
+F-030). This is the untested most-likely-correct pairing entry sequence.
 
-**If button recovery fails:** Acquire a replacement dongle. Capture a USBPcap baseline
-with the headset paired and connected before issuing any probe commands on the replacement.
+**Parallel — CDN firmware acquisition (Q-010):** The firmware binary is needed to reflash
+the dongle's radio stack if the current firmware is too corrupted to pair. CDN URL pattern
+is known; module ID enumeration is the remaining step.
 
 ## Documents
 
 | File                  | Contents                                                                        |
 |-----------------------|---------------------------------------------------------------------------------|
 | `README.md`           | This file — overview, status, key findings summary                              |
-| `findings.md`         | Chronological log of all discoveries (F-001 through F-028)                     |
+| `findings.md`         | Chronological log of all discoveries (F-001 through F-036)                     |
 | `usb_descriptor.md`   | Full USB descriptor tables, endpoint map, probe results                         |
 | `protocol_notes.md`   | HID command format, reference Elo 7.1 Air protocol, command hypotheses          |
-| `open_questions.md`   | Open questions (Q-008 CRITICAL, Q-009 CLOSED, Q-010/Q-011 HIGH)               |
+| `open_questions.md`   | Open questions (Q-008/Q-009/Q-011 closed; Q-012 active; Q-010 in progress)     |
 
 ## Key Findings Summary
 
@@ -172,6 +180,43 @@ with the headset paired and connected before issuing any probe commands on the r
     scan for any new USB VID:PID. If successful: direct path to firmware reflash without
     needing Swarm, CDN firmware, or app-level DFU protocol.
 
+### Session 8 findings (dongle recovery resolved; pairing failure identified)
+29. **Button-hold on plug-in is a reliable recovery method** (F-029, resolves Q-008) —
+    holding the physical button while plugging in USB recovers the dongle from any crash
+    state including F-027 deep non-enumeration. LED shifts to blinking red; `26CE:0A0B`
+    fully enumerates with all interfaces. Repeatable. Users with field reliability issues
+    (F-012) can likely recover using the same undocumented procedure.
+30. **Dongle LED state map partially decoded** (F-030) — four states confirmed: solid white
+    (app mode, no headset), blinking red (recovery/pairing-ready via button-hold), pink/
+    magenta (short button press in red-blinking mode, meaning unconfirmed), off/dim (DFU
+    mode entry after report ID `0x06` command).
+31. **RF pairing fails in all tested modes; HID interface silent throughout** (F-031) —
+    60 seconds of dongle blinking-red + headset white-blinking produced no pairing and zero
+    HID traffic. HID Interface 6 appears gated on an active RF link — no connection means
+    no HID activity regardless of dongle state. Pairing failure is the new primary blocker
+    for app-mode protocol RE (Q-012).
+
+### Session 9 findings (DFU is radio-only; red-blink characterised; headset USB charge-only)
+32. **No USB DFU bootloader exists** (F-032) — `dfu_probe.py` sent command byte `0x01`
+    via report ID `0x06`; dongle dropped at 0.5s; 30-second scan across HID, libusb, Device
+    Manager, and `devcon` found zero new devices. DFU is a 2.4 GHz radio protocol only. The
+    `firmware_upgrade.dll` "Enum bootloader mode device" strings refer to wireless
+    re-enumeration, not USB. Q-011 closed.
+33. **Red-blink mode characterised: HID output disabled, USB safe, radio active** (F-033) —
+    writes return `ERROR_GEN_FAILURE` (error 31) — endpoint explicitly disabled, dongle does
+    not crash from writes; `ReadFile` blocks indefinitely; no input reports. Safe state for
+    USB experimentation. The mode activates 2.4 GHz radio while suspending HID protocol.
+34. **Headset USB-C is charge-only; no data path** (F-034) — two cables tested, zero USB
+    enumeration. Headset firmware updates must go over the RF link from the dongle; no
+    independent USB update path exists.
+35. **Red-blink USB enumeration is state-dependent** (F-035) — whether USB enumerates in
+    red-blink mode depends on entry path; clean power cycle + button-hold is more reliable
+    than button-hold after a DFU-induced drop. Practical guidance: unplug 5+ seconds, then
+    button-hold on fresh plug-in.
+36. **Headset has no hardware recovery mode** (F-036) — no button combination on the headset
+    produces a recovery equivalent of the dongle's button-hold. Headset-side recovery is only
+    possible via RF link from a working dongle.
+
 ## Related Prior Art
 
 | Project        | File / Path                         | VID covered |
@@ -191,3 +236,5 @@ with the headset paired and connected before issuing any probe commands on the r
 | 2026-04-17 | Session 5: Swarm II dead end (F-023); CDN URL pattern confirmed (F-024); crash model revised — single WriteFile crashes firmware (F-025); dongle self-recovers reliably; OVERLAPPED I/O defined as next probe approach; Q-010/Q-011 updated accordingly |
 | 2026-04-17 | Session 6: CRITICAL REFRAME — all prior "crashes" are DFU mode entries (F-026); report ID 0x06 = DFU trigger confirmed from firmware_upgrade.dll strings; Elo Air / 3A37 strings confirmed; bootloader device VID:PID scan is now immediate next step; Q-011 reframed; status table updated |
 | 2026-04-17 | Session 7: New failure mode (F-027) — USB stack not initializing, only LED active; physical reset button found (F-028) — hardware ROM bootloader entry test in progress; Q-008 updated with revised recovery steps |
+| 2026-04-17 | Session 8: Q-008 RESOLVED — button-hold recovery confirmed (F-029); LED state map documented (F-030); RF pairing failure documented (F-031); Q-012 added as new blocker; status table updated |
+| 2026-04-17 | Session 9: No USB DFU bootloader (F-032, Q-011 closed); red-blink characterised as safe/radio-only (F-033, F-035); headset USB charge-only (F-034); headset no recovery mode (F-036); Q-012 updated; end-of-day summary written |

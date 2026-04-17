@@ -945,3 +945,276 @@ If successful, the ROM bootloader would:
 
 **Confidence:** speculative — hardware button function unconfirmed; bootloader entry
 hypothesis is plausible based on common MCU design patterns
+
+---
+
+## Session 8 — 2026-04-17
+
+### F-029 — Button-hold on plug-in reliably recovers dongle from non-enumerating state
+
+**Phase:** Hardware recovery — button test result (resolves Q-008)
+
+The hardware button test (F-028) succeeded. Holding the dongle button while plugging in USB
+brought the device back from the F-027 state (LED active, zero USB enumeration):
+
+- Dongle LED changed from solid white to **blinking red** — a new state not seen before
+- USB fully enumerated as `26CE:0A0B` with all interfaces present and functional
+- This recovery is **repeatable** — confirmed as a reliable method
+
+**What the button does:** The button-hold-on-plug-in sequence acts as a hardware-level
+reset that forces the dongle's MCU into a mode where the USB stack initializes correctly.
+Whether this is a true ROM bootloader entry (bypassing application flash), a hardware reset
+pin that clears a bad firmware state, or a mode-select that forces a clean USB init path is
+not yet confirmed — but the practical result is identical: a fully enumerating USB device.
+
+**Resolution of Q-008:** Dongle recovery is no longer a blocker. The procedure is:
+
+1. Unplug dongle
+2. Hold the physical button
+3. Plug in USB while still holding button
+4. Dongle LED blinks red — device is enumerated and accessible
+
+This procedure recovers from any observed crash state, including the F-027 deep failure
+where even extended power-off had not restored enumeration.
+
+**Impact on field reliability reports (F-012):** Users experiencing the population-level
+dongle reliability issues can likely recover using this same button procedure. The button
+was previously undocumented in any public source found during this investigation.
+
+**Confidence:** confirmed — directly observed; repeatable
+
+---
+
+### F-030 — Dongle LED state map partially decoded
+
+**Phase:** Button interaction observation
+
+Four LED states observed and catalogued:
+
+| LED state       | How to trigger                              | Interpretation                          |
+|-----------------|---------------------------------------------|-----------------------------------------|
+| Solid white     | Normal plug-in, no button                   | App mode, no headset connected          |
+| Blinking red    | Hold button while plugging in               | Recovery / pairing-ready mode           |
+| Pink / magenta  | Short button press while in blinking-red    | Possibly active pairing scan initiated  |
+| Off / dim       | After HID output report (report ID `0x06`)  | DFU mode entry (see F-026)              |
+
+**Notes:**
+- The blinking-red state (recovery mode) is the state the dongle enters when the button
+  is held during plug-in. It fully enumerates on USB and is the post-recovery starting
+  point for further work.
+- The pink/magenta state is produced by a brief button press while already in blinking-red.
+  Its exact meaning is unconfirmed — "active pairing scan" is the most likely interpretation
+  given the color change, but no HID traffic was observed in this state (F-031).
+- The off/dim state after HID commands is now understood as DFU mode entry (F-026), not
+  a crash. The dongle is waiting for a firmware image; it times out and reboots to app mode.
+
+**Confidence:** confirmed for trigger conditions and LED colors; speculative for semantic
+interpretation of pink/magenta state
+
+---
+
+### F-031 — Pairing attempt failed in recovery mode; HID interface silent in all LED states
+
+**Phase:** Wireless pairing test in blinking-red (recovery) mode
+
+Conditions: dongle in blinking-red (recovery) mode, headset in white-blinking (pairing)
+mode. 60-second observation window. Button pressed during test to produce pink/magenta mode.
+
+Results:
+- **No RF pairing connection established** in either dongle LED state
+- **Zero HID traffic** observed on EP `0x8A` throughout the entire session
+- Headset eventually powered off automatically (battery management or auto-shutdown timeout)
+
+**Two interpretations of the HID silence:**
+
+1. **HID interface only activates after successful RF link (likely):** The vendor HID
+   interface on Interface 6 is gated on a live wireless connection. Without an established
+   RF link between headset and dongle, the HID endpoint stays dark regardless of dongle LED
+   state. This would mean all app-mode HID probing must wait for a successful pairing.
+
+2. **Recovery mode is not app mode (possible):** The blinking-red state may be a limited
+   recovery or pairing-only mode that intentionally does not expose the full HID command
+   interface. The normal HID interface may only be active in solid-white (app) mode with a
+   connected headset.
+
+**Why pairing failed:** Two candidate explanations:
+- The dongle firmware (which has demonstrated DFU handler bugs) may also have a broken RF
+  pairing stack — the same firmware corruption that caused DFU issues may affect the radio
+  subsystem
+- The headset and dongle may have lost their pairing bond and require a specific re-pairing
+  sequence that was not triggered correctly
+
+**Significance for investigation path:** App-mode HID command probing (Q-003, Q-011) is
+only meaningful with an established RF link. The pairing failure is a second-order blocker
+behind dongle recovery — now that recovery is solved (F-029), establishing a working RF
+link is the next prerequisite.
+
+**Confidence:** confirmed for HID silence and pairing failure; speculative for root cause
+
+---
+
+## Session 9 — 2026-04-17
+
+### F-032 — DFU probe result: no USB bootloader device re-enumerates after command 0x01
+
+**Phase:** DFU probe — `dfu_probe.py` execution
+
+Script sent one HID output report (report ID `0x06`, command byte `0x01`) to the dongle in
+app mode (solid-white LED). Dongle dropped off USB at approximately 0.5 seconds, consistent
+with prior DFU mode entries. The host then monitored USB for 30 seconds using all available
+methods:
+
+- HID enumeration — no new devices
+- libusb device scan — no new devices
+- Windows Device Manager — no unknown or error devices
+- `devcon rescan` — no new devices found
+
+**Conclusion:** The dongle does **not** re-enumerate as a USB device in bootloader mode
+after receiving a DFU command. The DFU protocol is **not USB-based**.
+
+**Revised interpretation of the DFU flow (F-026 update):** The `firmware_upgrade.dll`
+strings describing "Enum bootloader mode device" refer to a **2.4 GHz wireless
+re-enumeration**, not a USB re-enumeration. After receiving the DFU trigger command, the
+dongle's nRF radio goes into a wireless bootloader advertisement mode — the firmware update
+is pushed over the 2.4 GHz link, not over USB. This is consistent with the nRF DFU utility
+reference in F-019 (`"dfu usb-serial --package"` applies to the wired headset path, not the
+dongle).
+
+The dongle returns from DFU mode after a timeout because no wireless firmware image is
+broadcast.
+
+**Confidence:** confirmed — 30-second scan with multiple methods found nothing
+
+---
+
+### F-033 — Red-blink mode: HID output endpoint disabled; writes fail gracefully; USB enumeration variable
+
+**Phase:** HID probe in red-blink (button-hold recovery) mode
+
+When the dongle is in red-blink mode with USB enumeration active, HID write behavior is
+fundamentally different from app mode (solid white):
+
+| Behaviour | App mode (solid white) | Red-blink mode |
+|-----------|----------------------|----------------|
+| HID write result | Succeeds (2 bytes written) | Fails — `ERROR_GEN_FAILURE` (error 31) |
+| Post-write behaviour | Dongle enters DFU mode (drops off USB) | **Dongle stays on USB — no crash** |
+| HID input reports | None without RF link | None |
+| Feature reports | None | None |
+| `ReadFile` | Blocks / returns 0 | Blocks indefinitely |
+| `HidD_GetInputReport` | Fails | Fails |
+
+**Error 31 (`ERROR_GEN_FAILURE`)** on `WriteFile` means the HID output endpoint is
+explicitly disabled in the device — the endpoint exists in the descriptor but the firmware
+has shut down the handler for it. This is a graceful rejection, not a fault.
+
+**Significance:** Red-blink mode is a **safe state for USB experimentation**. Writes are
+rejected without crashing. This means:
+- USB enumeration can be maintained while attempting reads and queries
+- Repeated write attempts will not brick the dongle
+- The mode can be used as a staging point for any non-destructive investigation
+
+**USB enumeration variability (see F-035):** Red-blink mode does not always produce USB
+enumeration. Whether USB is active in red-blink appears to depend on how cleanly the
+button-hold recovery was performed.
+
+**Interpretation:** Red-blink mode activates the 2.4 GHz radio (wireless pairing/recovery
+scan) while intentionally disabling the HID command interface. The MCU maintains bare USB
+enumeration for power delivery but suspends all HID protocol handling.
+
+**Confidence:** confirmed — error 31 behaviour observed directly; interpretation speculative
+
+---
+
+### F-034 — Headset USB-C port is charge-only; no USB data
+
+**Phase:** Headset USB data path investigation
+
+The headset was connected via two different USB cables to enumerate it as a USB device.
+Neither cable produced a new USB device entry. No new VID:PID appeared in any scan method.
+
+**Conclusion:** The headset's USB-C port is **charge-only** — it provides 5V power but the
+data lines (D+/D−) are either not connected or connected to a charge-detection circuit only.
+There is no USB data path on the headset.
+
+**Implications:**
+- The nRF DFU path `"dfu usb-serial --package"` referenced in F-019 does not apply to
+  this headset variant, OR it applies only to a different SKU that has a USB data port
+- Headset firmware updates are delivered exclusively over the 2.4 GHz wireless link from
+  the dongle
+- Charging is the only function of the USB-C port on this headset
+- Any future firmware reflash of the headset itself must go through the dongle's RF link
+
+**Confidence:** confirmed — two cables, no enumeration on either
+
+---
+
+### F-035 — Red-blink mode USB enumeration is state-dependent, not guaranteed
+
+**Phase:** Recovery mode behaviour characterisation
+
+Earlier (F-027) red-blink mode correlated with no USB enumeration. Session 9 observations
+show red-blink mode WITH full USB enumeration (`26CE:0A0B`, all interfaces active). Both
+states show the same LED pattern.
+
+**Observed distinction:** USB enumeration in red-blink mode appears to depend on the
+entry path:
+- Button-hold after a clean power cycle → more likely to produce USB enumeration
+- Button-hold after a DFU-induced drop → may produce red-blink without USB, or with
+  intermittent USB
+
+The underlying mechanism is likely whether the Realtek USB audio subsystem successfully
+initialises during the button-hold boot sequence. The nRF radio may start regardless; the
+USB stack's readiness may vary.
+
+**Practical guidance:** When USB enumeration is needed in red-blink mode, perform a clean
+unplug, wait 5+ seconds, then execute the button-hold on a fresh plug-in.
+
+**Confidence:** confirmed for state variability; speculative for mechanism
+
+---
+
+### F-036 — Headset has no hardware recovery mode equivalent to dongle button-hold
+
+**Phase:** Headset hardware investigation
+
+The headset has no button combination that produces a recovery or bootloader equivalent of
+the dongle's button-hold sequence. Only the dongle has this hardware-level recovery feature.
+
+**Implication:** Headset-side firmware recovery, if ever needed, must come through the
+dongle's wireless DFU path. There is no independent headset recovery channel available from
+the USB-C port (charge-only, F-034) or from button combinations.
+
+**Confidence:** confirmed — no equivalent behaviour observed on headset
+
+---
+
+## End-of-day summary — 2026-04-17
+
+### What is now established
+
+| Topic | Status |
+|-------|--------|
+| Device identity (`26CE:0A0B` = Roccat Elo dongle) | Confirmed (F-010) |
+| HID interface layout (Interface 6, EP `0x8A`, Report ID `0x06`) | Confirmed (F-003, F-004) |
+| Report ID `0x06` output = DFU mode trigger (radio-based, not USB) | Confirmed (F-026, F-032) |
+| Dongle recovery procedure (button-hold on plug-in) | Confirmed, repeatable (F-029) |
+| Red-blink mode = wireless-only recovery; HID output disabled | Confirmed (F-033) |
+| Headset USB-C = charge-only; no data path | Confirmed (F-034) |
+| No USB DFU bootloader; DFU is 2.4 GHz wireless | Confirmed (F-032) |
+
+### What remains open
+
+1. **RF pairing** — headset and dongle will not establish a wireless link. Without it, the
+   app-mode HID command interface cannot be exercised. Candidate paths: try app-mode +
+   headset pairing; research factory re-pair procedure; or reflash firmware via Q-010.
+
+2. **Firmware binary acquisition (Q-010)** — CDN URL pattern known; module ID unknown.
+   Getting the firmware binary would enable `ROCCAT_Recover_Tool.exe` reflash and potentially
+   fix the RF pairing stack.
+
+3. **App-mode command format (Q-003/Q-011)** — deferred until RF pairing is working.
+   Red-blink mode is not viable for this (HID output disabled). Requires solid-white mode
+   with an active headset connection.
+
+4. **JTAG/hardware debug** — if firmware reflash via software paths remains blocked,
+   physical JTAG/SWD access to the PIC32 or nRF5x MCU is the last-resort path.

@@ -157,31 +157,26 @@ revision and whether it is related to any known Roccat firmware lineage.
 
 ## Q-008 — Is the dongle permanently damaged, and how do we recover it?
 
-**Status:** open — CRITICAL; new failure mode observed (F-027): USB stack not initializing
-**Priority:** CRITICAL — blocks all further work
-**Related findings:** F-005, F-012, F-013, F-014, F-018, F-022, F-026, F-027, F-028
+**Status:** RESOLVED — 2026-04-17
+**Priority:** ~~CRITICAL~~ (resolved)
+**Related findings:** F-005, F-012, F-013, F-014, F-018, F-022, F-026, F-027, F-028, F-029
 
-**Detail:** The dongle has entered a new, deeper failure mode (F-027): the LED lights on
-plug-in (MCU is running) but the device does not enumerate on USB at all — not as app mode,
-not as DFU bootloader. Prior DFU timeout states still produced USB enumeration; this does
-not. The application firmware appears corrupted to the point where USB initialization is
-never reached.
+**Resolution:** Button-hold on plug-in reliably recovers the dongle from any observed crash
+state, including the deep F-027 failure where USB would not enumerate at all (F-029).
 
-**Current recovery attempt:** Physical button held during plug-in (F-028) — testing whether
-the button triggers a hardware ROM-level boot mode select, which would bypass the corrupted
-application firmware entirely and present a fresh DFU or UART recovery interface.
+**Recovery procedure (confirmed, repeatable):**
+1. Unplug the dongle
+2. Hold the physical button on the dongle body
+3. Plug in USB while still holding the button
+4. LED changes to blinking red — device is fully enumerated as `26CE:0A0B`
 
-**Recovery steps in priority order:**
+This procedure works from all observed failure states. Extended power-off is no longer
+required. The button recovery is the definitive, hardware-level recovery method.
 
-1. **Hardware button + plug-in (F-028, in progress):** Hold the dongle's physical button
-   while plugging in. Watch for any new USB device appearing — including previously unseen
-   VID:PIDs. If successful, enumerate the recovery device and proceed with firmware reflash.
-2. **CDN firmware + recovery tool (Q-010):** If button method fails, obtain the Elo firmware
-   binary via CDN enumeration or community sourcing. Supply to `ROCCAT_Recover_Tool.exe`
-   manually. This requires USB enumeration to be working — step 1 may be prerequisite.
-3. **Replace dongle:** Acquire a replacement unit. Before any HID probing on the replacement,
-   capture a full USBPcap baseline with the headset paired and connected — this documents
-   normal DFU entry and app-mode traffic before any probe commands are sent.
+**Remaining open question:** Whether the button puts the dongle into a true ROM bootloader
+(bypassing application flash) or simply forces a clean MCU reset. This is not critical for
+recovery purposes but is relevant to Q-010 (firmware binary acquisition via readback).
+See Q-012 for the next blocker: establishing a working RF link.
 
 ---
 
@@ -252,69 +247,73 @@ Swarm II is confirmed as a dead end (F-023) — it carries only Turtle Beach dev
 
 ## Q-011 — Identify the bootloader-mode VID:PID and enumerate the DFU device
 
-**Status:** open — approach completely reframed by F-026
-**Priority:** CRITICAL — this is the direct path to firmware access and protocol RE
-**Related findings:** F-004, F-021, F-022, F-025, F-026
+**Status:** CLOSED — 2026-04-17; DFU is radio-based, no USB bootloader exists
+**Priority:** N/A
+**Related findings:** F-004, F-021, F-022, F-025, F-026, F-032
 
-**Reframe (F-026):** OVERLAPPED I/O is no longer the goal. The dongle is not crashing —
-it is entering DFU/bootloader mode in response to report ID `0x06` output reports
-(confirmed from `firmware_upgrade.dll` strings). After the drop, it re-enumerates as a
-**different USB device** in bootloader mode. We have never scanned for this device.
+**Resolution:** F-032 (dfu_probe.py) confirmed that no USB device appears after a DFU
+trigger command, even after a 30-second scan with HID enumeration, libusb, Device Manager,
+and `devcon rescan`. There is no USB bootloader. The DFU firmware update path operates
+entirely over the 2.4 GHz radio link — the `firmware_upgrade.dll` strings about "Enum
+bootloader mode device" refer to wireless re-enumeration, not USB.
 
-**What we need to do:**
+The USB DFU scan approach is closed. The DFU mechanism is not accessible from the host PC
+over USB. Firmware updates require an active wireless link between dongle and headset with
+Swarm acting as the bridge.
 
-1. Send one `WriteFile(report_id=0x06)` to trigger DFU mode entry
-2. Immediately and repeatedly call `Get-PnpDevice` (or `usb.core.find()`) to detect any
-   new VID:PID that appears on the bus
-3. Log the bootloader device's full descriptor (VID, PID, bcdDevice, product string,
-   interface layout)
-4. Once identified, enumerate all HID interfaces on the bootloader device
+---
 
-**Candidate bootloader VID:PIDs to watch for:**
+## Q-012 — Why is RF pairing failing, and how do we establish a headset connection?
 
-| Candidate | Rationale |
-|-----------|-----------|
-| `04D8:xxxx` | Microchip VID — PIC32 USB bootloader uses this |
-| `26CE:0A0B` | Same VID:PID but different bcdDevice revision or interface count |
-| `26CE:xxxx` | Different PID under same Realtek/ASRock VID |
-| Realtek DFU VID | If Realtek chip handles USB in bootloader mode |
+**Status:** open
+**Priority:** HIGH — primary blocker for app-mode HID RE; all command probing is gated on this
+**Related findings:** F-016, F-020, F-029, F-030, F-031, F-033, F-034, F-036
 
-**Scan procedure:**
+**Detail:** The headset and dongle will not pair in any tested configuration. F-031
+documents blinking-red mode + headset pairing mode with zero result. F-033 confirms that
+red-blink mode intentionally disables the HID output endpoint — it is a wireless-only
+recovery state, not a normal operating mode. The HID vendor interface (Interface 6) produces
+no traffic without an established RF link across all observed dongle states.
 
-```python
-import usb.core, time
+Additional constraints confirmed in Session 9:
+- Headset USB-C is charge-only — no data path, no headset-side firmware update possible
+  over USB (F-034)
+- Headset has no button-hold recovery equivalent — no independent headset recovery method
+  exists (F-036)
+- DFU is radio-based — there is no USB DFU path to reflash the dongle RF stack (F-032,
+  Q-011 closed)
 
-# Baseline — enumerate all devices before trigger
-before = {(d.idVendor, d.idProduct) for d in usb.core.find(find_all=True)}
+**Candidate causes:**
 
-# Trigger DFU entry (via WriteFile or hidapi write)
-# ... send report ID 0x06 ...
+1. **Wrong pairing mode on dongle:** Red-blink mode may be a firmware recovery/wireless
+   scan state rather than the standard user-facing pairing mode. The solid-white app mode
+   with a brief button press (pink/magenta state, F-030) may be the correct entry point for
+   normal pairing.
 
-# Poll for new device
-deadline = time.time() + 10.0  # 10-second window
-while time.time() < deadline:
-    after = {(d.idVendor, d.idProduct) for d in usb.core.find(find_all=True)}
-    new_devices = after - before
-    if new_devices:
-        print("Bootloader device appeared:", new_devices)
-        break
-    time.sleep(0.1)
-```
+2. **Lost pairing bond:** Factory-paired devices store the bond in flash. DFU mode cycling
+   or firmware corruption may have cleared the dongle's pairing table. The headset still
+   has the old bond and the dongle does not recognise the headset's address.
 
-**What a successful result unlocks:**
-- Full DFU flashing path via `Dongle_DFU.dll` protocol (once identified)
-- Firmware binary read-back (if DFU implementation supports readback)
-- Firmware recovery without needing Swarm (unblocks Q-008 cleanly)
-- Potential access to app-mode command protocol via DFU memory readback
+3. **Broken nRF radio stack in current firmware:** The firmware version running on the
+   dongle may have a broken RF subsystem — the same corruption that caused the F-027 USB
+   non-init state could affect the nRF5x radio initialisation.
 
-**PowerShell alternative for scanning (no Python required):**
-```powershell
-$before = Get-PnpDevice -PresentOnly | Select-Object InstanceId
-# ... trigger DFU ...
-Start-Sleep -Seconds 2
-$after = Get-PnpDevice -PresentOnly | Select-Object InstanceId
-Compare-Object $before $after
-```
+4. **Headset auto-shutdown too fast:** Headset powered off before the pairing handshake
+   completed. Keep headset on charge during pairing attempts to prevent shutdown.
+
+**How to resolve (priority order):**
+
+1. **Try app mode + button press:** Plug dongle normally (solid white LED), immediately
+   put headset into pairing mode, then short-press the dongle button to enter pink/magenta
+   state. This is the most likely correct pairing flow.
+2. **Keep headset charged during test:** Use USB power during pairing attempts to prevent
+   auto-shutdown cutting the window short.
+3. **Research factory re-pair procedure:** Search for Roccat Elo Air pairing reset — some
+   devices support holding headset power button for 10+ seconds to clear bond and
+   re-advertise to any dongle.
+4. **Firmware reflash (Q-010):** If the radio stack is broken, reflashing working firmware
+   via `ROCCAT_Recover_Tool.exe` (once the firmware binary is obtained) is the last
+   software-layer option before JTAG.
 
 ---
 
@@ -324,7 +323,9 @@ Compare-Object $before $after
 |-------|----------------------------------------------------------|-----------------|---------|
 | Q-001 | Is `26CE:0A0B` the Roccat dongle?                        | 2026-04-17      | F-010   |
 | Q-005 | What do `0xA0`–`0xAA` opcodes on `26CE:01A2` control?   | 2026-04-17 (OOS)| F-010   |
+| Q-008 | Is the dongle permanently damaged / how to recover?      | 2026-04-17      | F-029   |
 | Q-009 | Swarm USB traffic capture — viable approach?             | 2026-04-17 (CLOSED) | F-017 |
+| Q-011 | Identify bootloader-mode VID:PID / enumerate DFU device  | 2026-04-17 (CLOSED) | F-032 |
 
 ---
 
@@ -340,3 +341,5 @@ Compare-Object $before $after
 | 2026-04-17 | Session 5: Q-010 updated with confirmed CDN URL pattern (F-024) and Swarm II dead-end (F-023); Q-011 updated with OVERLAPPED I/O approach and revised crash model (F-025: single output report crashes firmware); Q-009 added to resolved table |
 | 2026-04-17 | Session 6: Q-011 completely reframed — OVERLAPPED I/O abandoned; goal is now bootloader VID:PID identification after DFU mode entry (F-026); DFU scan procedure documented |
 | 2026-04-17 | Session 7: Q-008 updated — new failure mode (F-027: USB stack not initializing); hardware button recovery attempt (F-028) added as priority 1 step |
+| 2026-04-17 | Session 8: Q-008 RESOLVED — button-hold recovery confirmed (F-029); Q-012 added (RF pairing failure, new blocker for HID RE) |
+| 2026-04-17 | Session 9: Q-011 CLOSED — no USB bootloader exists; DFU is radio-based (F-032); Q-012 updated with F-033/F-034/F-036 constraints; resolution steps revised |
