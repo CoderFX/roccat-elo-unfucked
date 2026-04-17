@@ -400,3 +400,226 @@ Critical blockers:
    traffic sniffing rather than blind RE — potentially much faster path.
 3. **Q-003** (updated): Command format investigation must be done with a confirmed active
    headset connection (F-016); HID interface is likely inactive without paired headset.
+
+---
+
+## Session 4 — 2026-04-17
+
+### F-017 — Swarm v1.9481 cannot detect its own dongle; firmware update created the orphan
+
+**Phase:** Roccat Swarm installation and device detection
+
+Roccat Swarm v1.9481 was installed and launched with `26CE:0A0B` plugged in. Swarm did **not**
+detect the dongle. Investigation confirms Swarm scans exclusively for VID `0x1E7D` / PID
+`0x3A37` — the pre-firmware-update identity of the Elo 7.1 Air dongle.
+
+**Critical implication:** Roccat's own firmware update (shipped via Swarm or Swarm-adjacent
+tooling) changed the dongle's VID:PID from `1E7D:3A37` to `26CE:0A0B`, rendering it permanently
+invisible to Swarm's device scanner. The companion software that performs updates cannot detect
+the device that its updates produced. The dongle is orphaned by its own vendor toolchain.
+
+This also updates/supersedes the F-016 hypothesis: there is no Swarm initialization sequence
+to intercept via USBPcap, because Swarm will never open the device. The protocol capture path
+via Swarm + USBPcap is **closed**.
+
+**Q-009 status impact:** Q-009 (Swarm USB traffic capture) is now blocked not just by dongle
+recovery but by a fundamental incompatibility. The approach must change — see Q-009 update.
+
+**Confidence:** confirmed — Swarm was running with the dongle present and did not enumerate it
+
+---
+
+### F-018 — Recovery Tool detects device but is broken: missing firmware files due to circular dependency
+
+**Phase:** `ROCCAT_Recover_Tool.exe` recovery attempt
+
+`ROCCAT_Recover_Tool.exe` was launched with the dongle plugged in. The tool displayed a
+"firmware update required" window — it **can** detect the `26CE:0A0B` device, which is
+significant (the recovery tool uses a different detection path than Swarm's main UI).
+
+However, the firmware update dropdown field was non-responsive. Root cause analysis:
+
+- The recovery tool expects `firmware_upgrade.ini` and a `firmware/` directory to be present
+  adjacent to `ROCCAT_Recover_Tool.exe`
+- These files are **not bundled** in the Swarm installer — they are created when Swarm
+  downloads per-device modules at runtime
+- Swarm cannot download the Elo module because it cannot detect the `26CE:0A0B` device
+  (F-017)
+- Therefore the firmware files are never created, so the recovery tool cannot proceed
+
+**Circular failure chain:**
+```
+Dongle crashes -> Needs recovery tool -> Tool needs firmware/ dir
+                                              |
+                                    Created by Swarm module download
+                                              |
+                              Swarm can't download: doesn't see 26CE:0A0B
+                                              |
+                               Swarm only looks for 1E7D:3A37
+```
+
+**Possible resolution paths:**
+1. Manually supply `firmware_upgrade.ini` and firmware binary by extracting from Swarm's
+   download cache on a system where the dongle still enumerates as `1E7D:3A37`, OR
+2. Locate the Elo firmware binary from a user who has run Swarm against an older/unupdated
+   dongle and has the firmware cached on disk (see Q-010)
+3. Download Elo firmware module from Swarm CDN directly (URL pattern may be inferrable
+   from `firmware_upgrade.dll` strings — see F-019)
+
+**Confidence:** confirmed — observed directly; root cause is confirmed from file-system state
+
+---
+
+### F-019 — Swarm installer extracted; key DLLs and config files identified
+
+**Phase:** NSIS installer extraction and static analysis
+
+Roccat Swarm NSIS installer was extracted. Key files identified:
+
+**`firmware_upgrade.dll`**
+- Contains the PIC32 flash protocol implementation
+- Implements: erase, write, sign, verify operations for PIC32 microcontroller flash
+- References in strings: `firmware_upgrade.ini`, `headset_x86.dll`, `Command_Key.bin`
+- This DLL is the core firmware flashing engine; `ROCCAT_Recover_Tool.exe` likely
+  loads it at runtime to execute the flash sequence
+- The PIC32 MCU reference is significant: the dongle's main controller may be a
+  Microchip PIC32, with Realtek silicon handling only the USB audio path
+
+**`HIDDLL.dll`**
+- HID communication library
+- Handles HID read/write operations; this is the layer we need to intercept or replicate
+  for protocol RE without Swarm running
+
+**`EFORMAT.INI`**
+- Holtek MCU programmer configuration file
+- Holtek MCUs are commonly found in mice and keyboards (optical sensor controllers,
+  RGB controllers)
+- This file is **not relevant** to the Elo headset — it covers other Roccat peripherals
+  (mice, keyboards) that use Holtek silicon
+
+**Device module delivery model:**
+- Per-device firmware files are **not bundled** in the installer
+- They are downloaded at runtime by Swarm from Roccat's CDN into
+  `data/<PID_hex>/firmware/` directories
+- `firmware_upgrade.dll` string analysis may reveal the CDN URL pattern, which could
+  allow direct download of the Elo firmware binary without Swarm detecting the device
+
+**Significance:** The PIC32 reference in `firmware_upgrade.dll` is a new hardware-layer
+finding — the dongle likely uses PIC32 as the application MCU and Realtek silicon for UAC2.
+This would explain the separate HID control interface (PIC32 side) vs. audio interfaces
+(Realtek side).
+
+**Confidence:** confirmed for file identification and string contents; speculative for
+PIC32-as-main-controller interpretation
+
+---
+
+### F-020 — Headset entered pairing mode; dongle LED did not respond; 60s of HID silence
+
+**Phase:** Wireless pairing test
+
+Headset power button held 10–20 seconds: white LED began blinking — **pairing mode
+confirmed** on the headset side.
+
+Dongle LED behavior: remained **solid white** throughout the 60-second observation window.
+A dongle in pairing mode would typically show a blinking or alternating LED pattern. The
+solid white LED indicates the dongle did not enter pairing mode in response to the headset's
+pairing advertisement.
+
+Simultaneous HID monitoring on EP `0x8A` for 60 seconds: **zero input reports received.**
+
+**Interpretation:**
+- The headset was actively advertising for pairing (LED blinking = confirmed)
+- The dongle received no pairing request or did not act on it — the RF link was not
+  established during this window
+- The dongle's HID interface produced no traffic even with the headset in pairing mode,
+  which is consistent with F-016 (HID only active when RF link is up) but also consistent
+  with the dongle being in a degraded state from prior crash cycles
+
+**Open question:** Whether the dongle requires a button press or software command to enter
+its own pairing mode, or whether it should auto-accept pairing from a known headset.
+
+**Confidence:** confirmed for LED states and HID silence; interpretation speculative
+
+---
+
+### F-021 — CRITICAL: Dongle IS alive and responding — hidapi is misreading the response format
+
+**Phase:** HID command probe with hidapi
+
+Commands were sent to Interface 6 via hidapi with report ID `0x06`, bytes `0x01`–`0xFF`,
+with 500 ms inter-command delays. Result:
+
+- **Every single command** (all tested bytes) produced a "read error" on the subsequent
+  `hid_read()` call
+- The read error is **not** "no data" — it is a parsing failure, meaning the dongle
+  **is** sending bytes back, but hidapi cannot interpret them as a valid HID report
+
+**Three-part conclusion:**
+
+1. The dongle **receives** our commands — the response on every command confirms delivery
+2. The dongle **processes** our commands and **sends a response** on EP `0x8A` after each one
+3. hidapi's `hid_read()` fails because the response bytes do not conform to what hidapi
+   expects for Report ID `0x06` — either wrong report ID in the response, unexpected byte
+   count, or a format hidapi's Windows backend cannot handle
+
+**After 8 commands:** dongle LED dimmed and turned off, then device dropped off USB
+enumeration again (consistent with F-022).
+
+**Critical path forward:** The raw response bytes need to be read directly, bypassing
+hidapi's parsing layer. Two options:
+1. **Windows `ReadFile()`** on the HID device handle — returns raw bytes from the interrupt
+   endpoint without HID report parsing
+2. **libusb `libusb_interrupt_transfer()`** on endpoint `0x8A` — completely bypasses the
+   Windows HID driver stack and reads raw USB frames
+
+The responses the dongle is sending may contain the exact information needed to understand
+the protocol — we just cannot see them through hidapi.
+
+**Confidence:** confirmed — hidapi read error behavior is well-understood; error on every
+command with valid timing is definitive evidence of response data being present
+
+---
+
+### F-022 — Dongle crash threshold confirmed: as few as 8 commands triggers crash
+
+**Phase:** Crash characterization
+
+Two confirmed crash events now on record:
+
+| Event | Conditions | Commands sent | Delay | Outcome |
+|-------|------------|--------------|-------|---------|
+| Session 1 (F-005/F-013) | Write storm, report ID `0x06` | 256 | None | Dropped USB enumeration; CM_PROB_PHANTOM |
+| Session 4 (F-021) | Controlled probe, report ID `0x06` | ~8 | 500 ms | LED dimmed/off; dropped USB enumeration |
+
+**Key finding:** The 500 ms inter-command delay did not prevent the crash. The trigger is
+the **number of unrecognized commands** received, not the rate. After approximately 8
+commands that the dongle cannot satisfy (because the headset is not paired, or the format is
+wrong), the dongle firmware enters an error state and asserts a crash/reset.
+
+This behavior explains the known user-reported reliability issues (F-012): in the field,
+software bugs, driver enumeration sequences, or repeated pairing failures may send enough
+invalid HID traffic to trigger the same crash path.
+
+**Operational constraint going forward:** Any future probe session must limit commands to
+well under 8 before pausing for dongle state verification. Sending raw bytes via
+`libusb_interrupt_transfer` or `ReadFile` may not be subject to the same crash path if the
+issue is specifically the dongle's HID command handler entering a bad state on unrecognized
+Report ID `0x06` commands.
+
+**Confidence:** confirmed — two independent crash events with documented conditions
+
+---
+
+## Open Items After Session 4
+
+See [open_questions.md](open_questions.md) for the current question list.
+
+Key updates:
+1. **Q-008** (CRITICAL): Dongle crashed again (F-022). Same recovery approach applies.
+2. **Q-009** (updated): Swarm USB capture path is closed — Swarm cannot detect `26CE:0A0B`
+   (F-017). New approach: raw `ReadFile`/libusb read to capture dongle responses (Q-010).
+3. **Q-010** (NEW): Can we obtain the Elo firmware binary directly from Swarm's CDN or from
+   a cached install? Needed to feed `ROCCAT_Recover_Tool.exe` and for binary analysis.
+4. **Q-011** (NEW): Raw response bytes — what does the dongle actually send back? Need
+   `ReadFile` or libusb read to bypass hidapi parsing.

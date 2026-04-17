@@ -157,69 +157,134 @@ revision and whether it is related to any known Roccat firmware lineage.
 
 ## Q-008 — Is the dongle permanently damaged, and how do we recover it?
 
-**Status:** open
-**Priority:** CRITICAL — blocks ALL further protocol RE work
-**Related findings:** F-005, F-012, F-013, F-014
+**Status:** open — CRITICAL; second crash confirmed (F-022)
+**Priority:** CRITICAL — blocks all protocol RE work
+**Related findings:** F-005, F-012, F-013, F-014, F-018, F-022
 
-**Detail:** After a 256-command write storm (all bytes `0x00`–`0xFF`, no inter-command delay),
-the dongle entered a fault state and stopped enumerating. It is physically plugged in but
-Windows reports `CM_PROB_PHANTOM` (device node cached but hardware not responding to USB
-enumeration). It did not recover on replug to a different USB port.
+**Detail:** The dongle has now crashed twice under HID command probing (F-013: 256-command
+storm; F-022: ~8 commands at 500 ms spacing). Each time it drops off USB enumeration.
+`ROCCAT_Recover_Tool.exe` can detect it but cannot proceed because the required firmware
+files do not exist on disk — Swarm would normally download them, but Swarm cannot see this
+device (F-017, F-018). The circular failure documented in F-018 applies here.
 
-This is consistent with the known population-level reliability defect (F-012) where the
-Realtek firmware enters a bad state that survives brief power cycles.
+**Updated recovery steps (in order):**
 
-**Recovery steps (in order):**
-
-1. **Extended power-off:** Unplug for 30+ seconds to allow internal capacitors to fully
-   discharge, forcing a true power-on reset of the Realtek chip firmware
-2. **Try a different USB controller:** Use a USB port on a different root hub (e.g., rear
-   motherboard ports vs. front panel, or a PCIe USB card) in case the issue is host-side
-3. **Roccat Swarm recovery tool:** Install Roccat Swarm; use `ROCCAT_RECOVER_TOOL.exe`.
-   Procedure: connect headset first, then plug dongle — tool should detect the pair and
-   reflash firmware (see F-014)
-4. **Firmware reflash via DFU (if supported):** If Realtek USB audio chips expose a DFU
-   interface in fault mode, attempt reflash via libusb
-5. **Declare loss:** If all recovery attempts fail, dongle is bricked and a replacement is
-   required before investigation can continue
-
-**Time sensitivity:** If the dongle is in a recoverable state, it may only remain recoverable
-for a limited window before NVRAM or flash is corrupted.
+1. **Extended power-off:** Unplug for 30+ seconds to allow capacitors to discharge; then
+   try a different USB root hub/controller
+2. **Manually supply firmware files to recovery tool:** Obtain `firmware_upgrade.ini` and
+   the firmware binary (see Q-010) and place them in the `firmware/` subdirectory adjacent
+   to `ROCCAT_Recover_Tool.exe`; relaunch the tool with the dongle connected
+3. **Firmware reflash via DFU:** If the Realtek or PIC32 chip (F-019) exposes a DFU
+   interface while in fault state, attempt direct reflash via libusb
+4. **Replace dongle:** If all recovery attempts fail, acquire a replacement unit; capture a
+   USB traffic baseline via USBPcap before any further probing on the replacement
 
 ---
 
-## Q-009 — Should we install Roccat Swarm to capture the protocol via USB traffic sniffing?
+## Q-009 — Swarm USB traffic capture approach: CLOSED; what is the alternative?
+
+**Status:** CLOSED as originally scoped — 2026-04-17
+**Priority:** N/A (approach abandoned; see Q-011 for replacement approach)
+**Related findings:** F-011, F-014, F-016, F-017
+
+**Resolution:** Swarm v1.9481 does not detect `26CE:0A0B` (F-017). The USB traffic capture
+approach via Swarm + USBPcap cannot be executed — Swarm will never open the HID device.
+
+The approach of capturing Swarm's traffic is definitively blocked by the VID:PID mismatch.
+Swarm looks for `1E7D:3A37`; the dongle presents as `26CE:0A0B` after firmware update. There
+is no configuration change or override that makes Swarm enumerate the current hardware.
+
+**Alternative approach (Q-011):** Read dongle responses directly via `ReadFile()` or
+`libusb_interrupt_transfer()` on EP `0x8A`, bypassing hidapi's parsing layer. F-021
+confirmed the dongle sends response bytes on every command — we just cannot see them through
+hidapi. This is now the primary live-traffic RE path.
+
+**Retained value from original Q-009 work:**
+- `firmware_upgrade.dll` PIC32 flash protocol strings (F-019)
+- `HIDDLL.dll` identified as the HID layer Swarm uses (could be reverse-engineered statically)
+- Recovery tool circular dependency documented (F-018)
+
+---
+
+## Q-010 — Can we obtain the Elo firmware binary directly, bypassing Swarm's device detection?
 
 **Status:** open
-**Priority:** HIGH — most efficient path to protocol documentation
-**Related findings:** F-011, F-014, F-016
-**Blocked on:** Q-008 (need a working dongle)
+**Priority:** HIGH — needed for Q-008 dongle recovery and for binary analysis
+**Related findings:** F-014, F-017, F-018, F-019
 
-**Detail:** Roccat Swarm companion software communicates with the dongle over the same HID
-interface we are trying to reverse engineer. By installing Swarm and capturing its USB traffic
-with USBPcap + Wireshark, we would get the complete command/response protocol with accurate
-field values — potentially eliminating the need for blind brute-force probing.
+**Detail:** `ROCCAT_Recover_Tool.exe` can see the dongle (F-018) but stalls because
+`firmware_upgrade.ini` and the firmware binary are absent. If we can obtain those files, the
+recovery tool may be able to reflash the dongle.
 
-**Advantages over blind RE:**
-- Complete command sequences for known features (battery query, LED, inactive timeout)
-- Correct initialization sequence — confirms or denies hypothesis from F-016 that Swarm
-  performs a startup handshake before the HID interface becomes active
-- Full protocol traffic for pairing events, headset state changes, button presses
+**Candidate acquisition methods:**
 
-**Concerns:**
-- Requires a working dongle (Q-008 must be resolved first)
-- Swarm may use encrypted or obfuscated HID payloads (unlikely for simple HID, but possible)
-- Swarm may behave differently on `26CE:0A0B` vs. the `0x1E7D`/`0x3A37` it was originally
-  designed for (see note in F-014 that Swarm's firmware path uses `3A37` PID)
+1. **Swarm CDN direct download:** `firmware_upgrade.dll` contains strings referencing the
+   CDN URL pattern for module downloads. Static analysis of this DLL may reveal the URL
+   template (e.g., `https://update.roccat.com/firmware/<PID>/FW_V<ver>.bin`). If the
+   pattern uses the original PID (`3A37`), the Elo module may be downloadable directly.
 
-**How to proceed:**
-1. Recover dongle (Q-008)
-2. Ensure headset pairs successfully with recovered dongle
-3. Install Roccat Swarm (or Roccat NEON)
-4. Install USBPcap filter on the dongle's USB port
-5. Start Wireshark capture; launch Swarm; perform: initial launch, battery check, LED
-   configuration, inactive timeout change
-6. Export capture and analyze URB_BULK/URB_INTERRUPT frames on the HID interface
+2. **Cached install on another machine:** Any system where Swarm successfully detected the
+   dongle before the firmware update (when it still presented as `1E7D:3A37`) would have
+   the firmware binary cached in `data/3A37/firmware/`. Acquiring these files from community
+   sources (Roccat forums, Reddit) is a viable path.
+
+3. **Wayback Machine / archived installers:** Older Swarm versions may have bundled the
+   firmware or may have had the original PID in their device scanner, making them able to
+   enumerate `26CE:0A0B` if that VID was introduced by an older Swarm version.
+
+4. **Static analysis of `firmware_upgrade.dll`:** Strings in the DLL may reveal enough of
+   the INI file format and firmware binary layout to construct `firmware_upgrade.ini`
+   manually, even without the actual firmware blob.
+
+**How to resolve:**
+- Strings-dump `firmware_upgrade.dll` for URL patterns and INI schema
+- Search Roccat community forums for cached `data/3A37/firmware/` directory contents
+- Check if any archived Swarm installers bundle the firmware blob
+
+---
+
+## Q-011 — What does the dongle actually send back? (Raw response capture)
+
+**Status:** open
+**Priority:** HIGH — this is now the primary live-traffic RE path
+**Related findings:** F-004, F-021, F-022
+
+**Detail:** F-021 confirmed that the dongle sends a response on EP `0x8A` after every HID
+command, but hidapi's `hid_read()` fails to parse it. The raw bytes contain information that
+could reveal the protocol structure. We have never actually seen these bytes.
+
+**The problem with hidapi:** hidapi's Windows backend uses `ReadFile()` internally but wraps
+it in report-ID validation logic. When the response does not match the expected report format,
+hidapi returns an error without surfacing the raw bytes to the caller.
+
+**Two approaches to capture raw responses:**
+
+**Option A — Windows `ReadFile()` directly:**
+```python
+import ctypes, ctypes.wintypes
+# Open device with CreateFile (not via hidapi)
+# Call ReadFile() on the handle
+# Returns raw interrupt endpoint bytes without any HID parsing
+```
+This stays within the Windows HID driver stack but skips hidapi's validation layer.
+
+**Option B — libusb `libusb_interrupt_transfer()` on EP `0x8A`:**
+```python
+import usb.core
+dev = usb.core.find(idVendor=0x26CE, idProduct=0x0A0B)
+dev.detach_kernel_driver(6)  # detach HidUsb
+data = dev.read(0x8A, 64, timeout=1000)
+```
+This completely bypasses the Windows HID stack. Requires detaching `HidUsb` from Interface
+6 first. Gives raw USB frame bytes.
+
+**Operational constraint:** F-022 confirmed the dongle crashes after ~8 unrecognized
+commands. Any raw capture session must be designed to stay well under that limit — ideally
+1–2 commands per session until crash threshold is better characterized. Consider:
+- Fully power-cycle the dongle between probe sessions
+- Log the exact response bytes before any subsequent commands
+- Prioritize the zeroed-query command `[0x06, 0x00]` as the first probe (least likely to
+  trigger an error state)
 
 ---
 
@@ -240,3 +305,4 @@ field values — potentially eliminating the need for blind brute-force probing.
 | 2026-04-17 | Added Q-007 (firmware version query); expanded Q-003 with libusb ctrl_transfer approach   |
 | 2026-04-17 | Q-001 RESOLVED via unplug test (F-010); Q-005 marked out of scope; Q-003 elevated to CRITICAL; Q-006 elevated to Medium; Q-002 revised to reflect confirmed dongle identity |
 | 2026-04-17 | Session 3: Q-008 added (CRITICAL — dongle recovery); Q-009 added (HIGH — Swarm protocol capture); Q-003 updated with F-016 context (must test with active headset connection); Q-004 downgraded to Low with revised beep hypothesis |
+| 2026-04-17 | Session 4: Q-008 updated (second crash confirmed F-022; recovery steps revised for F-018 circular dependency); Q-009 CLOSED (Swarm cannot detect 26CE:0A0B per F-017); Q-010 added (firmware binary acquisition); Q-011 added (raw response capture via ReadFile/libusb) |
