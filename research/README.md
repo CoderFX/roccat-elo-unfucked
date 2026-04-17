@@ -32,40 +32,43 @@ re-spin that requires independent protocol documentation.
 | Dongle identity confirmation   | Complete             | Confirmed `26CE:0A0B` via unplug test (F-010)                    |
 | Scope determination            | Complete             | `26CE:01A2` is out of scope; protocol RE from scratch (F-011)    |
 | Known defect characterization  | Complete             | Population-level reliability defect documented (F-012)                    |
-| Dongle crash characterization  | Complete             | Crashes after ~8 unrecognized commands; confirmed twice (F-013, F-022)    |
-| Swarm analysis                 | Complete             | Swarm cannot detect `26CE:0A0B`; firmware files absent (F-017, F-018, F-019) |
-| Dongle recovery                | **CRITICAL BLOCKED** | Second crash confirmed; recovery tool stalled on missing firmware (Q-008) |
-| Raw response capture           | **Next priority**    | F-021 confirmed dongle responds; need ReadFile/libusb to read bytes (Q-011) |
-| Firmware binary acquisition    | Not started          | Needed for recovery tool; CDN/cache paths identified (Q-010)              |
-| HID command format             | Blocked              | Blocked on dongle recovery; needs paired headset per F-016                |
-| Battery reporting              | Not started          | Blocked on Q-008, Q-003                                                   |
-| Audio control event monitoring | Not started          | Q-006 — elevated priority                                                 |
-| USB traffic capture (Swarm)    | CLOSED               | Swarm cannot see `26CE:0A0B` — approach abandoned (F-017, Q-009)          |
-| Firmware version query         | Not started          | Q-007 — blocked on Q-008                                                  |
+| DFU mode characterization      | **Complete**         | "Crashes" are DFU mode entries; report ID 0x06 = DFU trigger (F-026)     |
+| Swarm analysis                 | Complete             | Swarm cannot detect `26CE:0A0B`; DLL strings reveal full DFU flow (F-017–F-019, F-026) |
+| Dongle recovery                | **CRITICAL BLOCKED** | USB stack not initializing (F-027); hardware button test in progress (F-028, Q-008) |
+| Hardware button recovery       | **In progress**      | Physical button held on plug-in — testing ROM bootloader entry (F-028)            |
+| Bootloader device identification | Pending            | Blocked until dongle re-enumerates in any mode (Q-011)                            |
+| Firmware binary acquisition    | In progress          | CDN URL confirmed (F-024); Elo module ID needed (Q-010)                           |
+| HID command format             | Blocked              | Blocked on dongle recovery; report ID `0x06` = DFU trigger (F-026)               |
+| Battery reporting              | Not started          | Blocked on app-mode command format (Q-003)                                 |
+| Audio control event monitoring | Not started          | Q-006 — elevated priority                                                  |
+| USB traffic capture (Swarm)    | CLOSED               | Swarm cannot see `26CE:0A0B`; Swarm II out of scope (F-017, F-023)         |
+| Firmware version query         | Not started          | Q-007 — may be answerable via DFU memory readback                          |
 
-## Current Blocker
+## Current Blocker / Next Steps
 
-**Q-008** — Dongle crashed again (second confirmed event, F-022) and will not re-enumerate.
-The Swarm recovery path (Q-009) is definitively closed — Swarm v1.9481 does not detect
-`26CE:0A0B`. Recovery now requires manually supplying the firmware binary to the recovery
-tool (Q-010) or replacing the dongle.
+**Current state (F-027):** The dongle has entered a deeper failure mode than prior DFU
+timeouts. LED lights on plug-in (MCU running) but no USB enumeration occurs at all — not
+app mode, not DFU bootloader. The application firmware is corrupted to the point where USB
+initialization is never reached.
 
-Recovery steps in current priority order:
+**Active recovery attempt — hardware button (F-028):**
+Hold the physical button on the dongle body while plugging in. If the button is wired to a
+hardware boot-mode-select pin (analogous to BOOT0 on STM32), it bypasses corrupted
+application firmware and enters a factory ROM bootloader. Watch for any new USB VID:PID
+appearing on the bus — including previously unseen ones.
 
-1. Extended power-off (30+ seconds) — try a different USB root hub after
-2. Manually supply firmware files to `ROCCAT_Recover_Tool.exe` (see Q-010 for acquisition)
-3. Replace dongle; perform USBPcap capture baseline before any further HID probing
+**If button recovery works:** Identify and enumerate the ROM bootloader device; flash
+known-good firmware via whatever protocol it exposes (DFU, UART, ICSP).
 
-**Next productive step while dongle is down:** Static analysis of `firmware_upgrade.dll`
-and `HIDDLL.dll` from the Swarm install to extract CDN URL pattern (Q-010) and understand
-the HID command format from Swarm's own HID library (Q-011).
+**If button recovery fails:** Acquire a replacement dongle. Capture a USBPcap baseline
+with the headset paired and connected before issuing any probe commands on the replacement.
 
 ## Documents
 
 | File                  | Contents                                                                        |
 |-----------------------|---------------------------------------------------------------------------------|
 | `README.md`           | This file — overview, status, key findings summary                              |
-| `findings.md`         | Chronological log of all discoveries (F-001 through F-022)                     |
+| `findings.md`         | Chronological log of all discoveries (F-001 through F-028)                     |
 | `usb_descriptor.md`   | Full USB descriptor tables, endpoint map, probe results                         |
 | `protocol_notes.md`   | HID command format, reference Elo 7.1 Air protocol, command hypotheses          |
 | `open_questions.md`   | Open questions (Q-008 CRITICAL, Q-009 CLOSED, Q-010/Q-011 HIGH)               |
@@ -129,6 +132,46 @@ the HID command format from Swarm's own HID library (Q-011).
     event with 500 ms inter-command delays; trigger is unrecognized command count, not rate;
     all future probe sessions must stay well under 8 commands per power cycle.
 
+### Session 5 findings (crash model refined; CDN URL confirmed)
+21. **Swarm II carries no Roccat device modules** (F-023) — Turtle Beach Swarm II v1.0.0.38
+    extracted; contains only Qt runtime and Swarm II metadata; no Roccat firmware; dead end
+    for firmware acquisition.
+22. **CDN URL pattern confirmed** (F-024) — module downloads use
+    `https://acpv.prod.turtlebeach.com/swarm1/form/<module_id>` where the module ID is an
+    integer from `version.ini`, not the PID; Elo module ID enumeration or community sourcing
+    needed to complete firmware acquisition.
+23. **Single WriteFile triggers DFU mode entry** (F-025) — `WriteFile` succeeded (2 bytes
+    written, no error); dongle dropped off USB immediately. Now understood (F-026) to be a
+    successful DFU mode-entry command, not a crash.
+
+### Session 6 findings (CRITICAL REFRAME — DFU mode, not crashes)
+24. **Every prior "crash" was DFU mode entry** (F-026) — deep string analysis of
+    `firmware_upgrade.dll` confirms: report ID `0x06` output report = DFU mode-entry command
+    (`"Try to start DFU mode failed, 0x06 command failed"`); command `0x07` = check DFU
+    status / reboot FW. The dongle was obeying every command correctly. It re-enumerates as
+    a different VID:PID in bootloader mode — we never scanned for it. The "30s–5min recovery"
+    is the DFU bootloader timeout before it reboots to app mode.
+25. **Dongle hardware architecture confirmed from DLL strings** (F-026) — `"Elo Air"` and
+    `"3A37"` strings present; `Dongle_DFU.dll` handles dongle flashing; nRF DFU handles
+    headset RF firmware via USB cable; PIC32/Holtek/CMedia/ATTiny/nRF updaters all present
+    for different Roccat peripheral chips.
+26. **User-reported field reliability failures (F-012) are reframed** (F-026) — the
+    population-level dongle failures in the field are now a credible consequence of DFU mode
+    being triggered by software bugs, driver quirks, or malformed HID traffic from third-party
+    tools; the dongle enters bootloader mode and the DFU timeout leaves it in an intermediate
+    state until power-cycled.
+
+### Session 7 findings (hardware recovery; new failure mode)
+27. **Dongle USB stack not initializing — new, deeper failure mode** (F-027) — after cap
+    drain and port changes: LED lights (MCU running) but zero USB enumeration, no partial
+    or error devices, nothing in PnP/HID/libusb. Distinct from prior DFU timeout states
+    which still produced USB enumeration. Application firmware corrupted past USB init.
+28. **Physical reset button found on dongle body** (F-028) — pinhole or tactile button;
+    may trigger hardware ROM-level boot mode select (analogous to BOOT0 on STM32), bypassing
+    corrupted application firmware entirely. Test in progress: hold button while plugging in,
+    scan for any new USB VID:PID. If successful: direct path to firmware reflash without
+    needing Swarm, CDN firmware, or app-level DFU protocol.
+
 ## Related Prior Art
 
 | Project        | File / Path                         | VID covered |
@@ -145,3 +188,6 @@ the HID command format from Swarm's own HID library (Q-011).
 | 2026-04-17 | Session 2: Q-001 resolved; `26CE:01A2` out of scope; protocol RE scope established                 |
 | 2026-04-17 | Session 3: Dongle crash documented (F-013); reliability defect background (F-012); Swarm recovery path (F-014); HID inactive-without-headset hypothesis (F-016); Q-008 and Q-009 added; status table updated to reflect blocked state |
 | 2026-04-17 | Session 4: Swarm installed — cannot detect 26CE:0A0B (F-017); recovery tool circular dependency (F-018); Swarm extraction/PIC32 finding (F-019); pairing test (F-020); dongle response confirmed via hidapi error (F-021); crash threshold ~8 commands (F-022); Q-009 closed; Q-010/Q-011 added |
+| 2026-04-17 | Session 5: Swarm II dead end (F-023); CDN URL pattern confirmed (F-024); crash model revised — single WriteFile crashes firmware (F-025); dongle self-recovers reliably; OVERLAPPED I/O defined as next probe approach; Q-010/Q-011 updated accordingly |
+| 2026-04-17 | Session 6: CRITICAL REFRAME — all prior "crashes" are DFU mode entries (F-026); report ID 0x06 = DFU trigger confirmed from firmware_upgrade.dll strings; Elo Air / 3A37 strings confirmed; bootloader device VID:PID scan is now immediate next step; Q-011 reframed; status table updated |
+| 2026-04-17 | Session 7: New failure mode (F-027) — USB stack not initializing, only LED active; physical reset button found (F-028) — hardware ROM bootloader entry test in progress; Q-008 updated with revised recovery steps |

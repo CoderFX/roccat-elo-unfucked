@@ -157,27 +157,31 @@ revision and whether it is related to any known Roccat firmware lineage.
 
 ## Q-008 — Is the dongle permanently damaged, and how do we recover it?
 
-**Status:** open — CRITICAL; second crash confirmed (F-022)
-**Priority:** CRITICAL — blocks all protocol RE work
-**Related findings:** F-005, F-012, F-013, F-014, F-018, F-022
+**Status:** open — CRITICAL; new failure mode observed (F-027): USB stack not initializing
+**Priority:** CRITICAL — blocks all further work
+**Related findings:** F-005, F-012, F-013, F-014, F-018, F-022, F-026, F-027, F-028
 
-**Detail:** The dongle has now crashed twice under HID command probing (F-013: 256-command
-storm; F-022: ~8 commands at 500 ms spacing). Each time it drops off USB enumeration.
-`ROCCAT_Recover_Tool.exe` can detect it but cannot proceed because the required firmware
-files do not exist on disk — Swarm would normally download them, but Swarm cannot see this
-device (F-017, F-018). The circular failure documented in F-018 applies here.
+**Detail:** The dongle has entered a new, deeper failure mode (F-027): the LED lights on
+plug-in (MCU is running) but the device does not enumerate on USB at all — not as app mode,
+not as DFU bootloader. Prior DFU timeout states still produced USB enumeration; this does
+not. The application firmware appears corrupted to the point where USB initialization is
+never reached.
 
-**Updated recovery steps (in order):**
+**Current recovery attempt:** Physical button held during plug-in (F-028) — testing whether
+the button triggers a hardware ROM-level boot mode select, which would bypass the corrupted
+application firmware entirely and present a fresh DFU or UART recovery interface.
 
-1. **Extended power-off:** Unplug for 30+ seconds to allow capacitors to discharge; then
-   try a different USB root hub/controller
-2. **Manually supply firmware files to recovery tool:** Obtain `firmware_upgrade.ini` and
-   the firmware binary (see Q-010) and place them in the `firmware/` subdirectory adjacent
-   to `ROCCAT_Recover_Tool.exe`; relaunch the tool with the dongle connected
-3. **Firmware reflash via DFU:** If the Realtek or PIC32 chip (F-019) exposes a DFU
-   interface while in fault state, attempt direct reflash via libusb
-4. **Replace dongle:** If all recovery attempts fail, acquire a replacement unit; capture a
-   USB traffic baseline via USBPcap before any further probing on the replacement
+**Recovery steps in priority order:**
+
+1. **Hardware button + plug-in (F-028, in progress):** Hold the dongle's physical button
+   while plugging in. Watch for any new USB device appearing — including previously unseen
+   VID:PIDs. If successful, enumerate the recovery device and proceed with firmware reflash.
+2. **CDN firmware + recovery tool (Q-010):** If button method fails, obtain the Elo firmware
+   binary via CDN enumeration or community sourcing. Supply to `ROCCAT_Recover_Tool.exe`
+   manually. This requires USB enumeration to be working — step 1 may be prerequisite.
+3. **Replace dongle:** Acquire a replacement unit. Before any HID probing on the replacement,
+   capture a full USBPcap baseline with the headset paired and connected — this documents
+   normal DFU entry and app-mode traffic before any probe commands are sent.
 
 ---
 
@@ -208,83 +212,109 @@ hidapi. This is now the primary live-traffic RE path.
 
 ## Q-010 — Can we obtain the Elo firmware binary directly, bypassing Swarm's device detection?
 
-**Status:** open
+**Status:** open — CDN URL pattern confirmed; module ID is the missing piece (F-024)
 **Priority:** HIGH — needed for Q-008 dongle recovery and for binary analysis
-**Related findings:** F-014, F-017, F-018, F-019
+**Related findings:** F-014, F-017, F-018, F-019, F-023, F-024
 
 **Detail:** `ROCCAT_Recover_Tool.exe` can see the dongle (F-018) but stalls because
-`firmware_upgrade.ini` and the firmware binary are absent. If we can obtain those files, the
-recovery tool may be able to reflash the dongle.
+`firmware_upgrade.ini` and the firmware binary are absent. The CDN URL pattern is now known
+(F-024): `https://acpv.prod.turtlebeach.com/swarm1/form/<module_id>`. The Elo module ID
+must be resolved — it is an integer key from Swarm's `version.ini`, not the PID directly.
 
-**Candidate acquisition methods:**
+Swarm II is confirmed as a dead end (F-023) — it carries only Turtle Beach device modules.
 
-1. **Swarm CDN direct download:** `firmware_upgrade.dll` contains strings referencing the
-   CDN URL pattern for module downloads. Static analysis of this DLL may reveal the URL
-   template (e.g., `https://update.roccat.com/firmware/<PID>/FW_V<ver>.bin`). If the
-   pattern uses the original PID (`3A37`), the Elo module may be downloadable directly.
+**Candidate acquisition methods (updated):**
 
-2. **Cached install on another machine:** Any system where Swarm successfully detected the
-   dongle before the firmware update (when it still presented as `1E7D:3A37`) would have
-   the firmware binary cached in `data/3A37/firmware/`. Acquiring these files from community
-   sources (Roccat forums, Reddit) is a viable path.
+1. **Enumerate CDN module IDs:** The `version.ini` section numbers appear to be small
+   integers. Iterating a plausible range (e.g., 1–200) against the CDN endpoint and
+   inspecting responses for Elo-related content may locate the module without needing a
+   `version.ini` that lists the Elo device.
 
-3. **Wayback Machine / archived installers:** Older Swarm versions may have bundled the
-   firmware or may have had the original PID in their device scanner, making them able to
-   enumerate `26CE:0A0B` if that VID was introduced by an older Swarm version.
+2. **Extract module ID from a Swarm install that detected `1E7D:3A37`:** Any system where
+   Swarm enumerated the dongle under its original VID:PID would have the Elo module ID in
+   `version.ini` and the firmware binary cached in `data/3A37/firmware/`. Community sourcing
+   (Roccat forums, Reddit) is viable.
 
-4. **Static analysis of `firmware_upgrade.dll`:** Strings in the DLL may reveal enough of
-   the INI file format and firmware binary layout to construct `firmware_upgrade.ini`
-   manually, even without the actual firmware blob.
+3. **Static analysis of `firmware_upgrade.dll` for INI schema:** The DLL may contain enough
+   format strings to reconstruct a valid `firmware_upgrade.ini` manually. Combined with the
+   firmware binary from method 1 or 2, this would feed the recovery tool.
+
+4. **Wayback Machine / archived Swarm installers:** Older installers may bundle firmware or
+   carry a `version.ini` that includes the Elo module ID.
 
 **How to resolve:**
-- Strings-dump `firmware_upgrade.dll` for URL patterns and INI schema
-- Search Roccat community forums for cached `data/3A37/firmware/` directory contents
-- Check if any archived Swarm installers bundle the firmware blob
+- Attempt CDN enumeration: iterate `https://acpv.prod.turtlebeach.com/swarm1/form/N`
+  for N in 1–200; inspect HTTP responses for firmware binary signatures
+- Search Roccat community for `data/3A37/firmware/` cache contents
+- Strings-dump `firmware_upgrade.dll` for INI format schema
 
 ---
 
-## Q-011 — What does the dongle actually send back? (Raw response capture)
+## Q-011 — Identify the bootloader-mode VID:PID and enumerate the DFU device
 
-**Status:** open
-**Priority:** HIGH — this is now the primary live-traffic RE path
-**Related findings:** F-004, F-021, F-022
+**Status:** open — approach completely reframed by F-026
+**Priority:** CRITICAL — this is the direct path to firmware access and protocol RE
+**Related findings:** F-004, F-021, F-022, F-025, F-026
 
-**Detail:** F-021 confirmed that the dongle sends a response on EP `0x8A` after every HID
-command, but hidapi's `hid_read()` fails to parse it. The raw bytes contain information that
-could reveal the protocol structure. We have never actually seen these bytes.
+**Reframe (F-026):** OVERLAPPED I/O is no longer the goal. The dongle is not crashing —
+it is entering DFU/bootloader mode in response to report ID `0x06` output reports
+(confirmed from `firmware_upgrade.dll` strings). After the drop, it re-enumerates as a
+**different USB device** in bootloader mode. We have never scanned for this device.
 
-**The problem with hidapi:** hidapi's Windows backend uses `ReadFile()` internally but wraps
-it in report-ID validation logic. When the response does not match the expected report format,
-hidapi returns an error without surfacing the raw bytes to the caller.
+**What we need to do:**
 
-**Two approaches to capture raw responses:**
+1. Send one `WriteFile(report_id=0x06)` to trigger DFU mode entry
+2. Immediately and repeatedly call `Get-PnpDevice` (or `usb.core.find()`) to detect any
+   new VID:PID that appears on the bus
+3. Log the bootloader device's full descriptor (VID, PID, bcdDevice, product string,
+   interface layout)
+4. Once identified, enumerate all HID interfaces on the bootloader device
 
-**Option A — Windows `ReadFile()` directly:**
+**Candidate bootloader VID:PIDs to watch for:**
+
+| Candidate | Rationale |
+|-----------|-----------|
+| `04D8:xxxx` | Microchip VID — PIC32 USB bootloader uses this |
+| `26CE:0A0B` | Same VID:PID but different bcdDevice revision or interface count |
+| `26CE:xxxx` | Different PID under same Realtek/ASRock VID |
+| Realtek DFU VID | If Realtek chip handles USB in bootloader mode |
+
+**Scan procedure:**
+
 ```python
-import ctypes, ctypes.wintypes
-# Open device with CreateFile (not via hidapi)
-# Call ReadFile() on the handle
-# Returns raw interrupt endpoint bytes without any HID parsing
-```
-This stays within the Windows HID driver stack but skips hidapi's validation layer.
+import usb.core, time
 
-**Option B — libusb `libusb_interrupt_transfer()` on EP `0x8A`:**
-```python
-import usb.core
-dev = usb.core.find(idVendor=0x26CE, idProduct=0x0A0B)
-dev.detach_kernel_driver(6)  # detach HidUsb
-data = dev.read(0x8A, 64, timeout=1000)
-```
-This completely bypasses the Windows HID stack. Requires detaching `HidUsb` from Interface
-6 first. Gives raw USB frame bytes.
+# Baseline — enumerate all devices before trigger
+before = {(d.idVendor, d.idProduct) for d in usb.core.find(find_all=True)}
 
-**Operational constraint:** F-022 confirmed the dongle crashes after ~8 unrecognized
-commands. Any raw capture session must be designed to stay well under that limit — ideally
-1–2 commands per session until crash threshold is better characterized. Consider:
-- Fully power-cycle the dongle between probe sessions
-- Log the exact response bytes before any subsequent commands
-- Prioritize the zeroed-query command `[0x06, 0x00]` as the first probe (least likely to
-  trigger an error state)
+# Trigger DFU entry (via WriteFile or hidapi write)
+# ... send report ID 0x06 ...
+
+# Poll for new device
+deadline = time.time() + 10.0  # 10-second window
+while time.time() < deadline:
+    after = {(d.idVendor, d.idProduct) for d in usb.core.find(find_all=True)}
+    new_devices = after - before
+    if new_devices:
+        print("Bootloader device appeared:", new_devices)
+        break
+    time.sleep(0.1)
+```
+
+**What a successful result unlocks:**
+- Full DFU flashing path via `Dongle_DFU.dll` protocol (once identified)
+- Firmware binary read-back (if DFU implementation supports readback)
+- Firmware recovery without needing Swarm (unblocks Q-008 cleanly)
+- Potential access to app-mode command protocol via DFU memory readback
+
+**PowerShell alternative for scanning (no Python required):**
+```powershell
+$before = Get-PnpDevice -PresentOnly | Select-Object InstanceId
+# ... trigger DFU ...
+Start-Sleep -Seconds 2
+$after = Get-PnpDevice -PresentOnly | Select-Object InstanceId
+Compare-Object $before $after
+```
 
 ---
 
@@ -294,6 +324,7 @@ commands. Any raw capture session must be designed to stay well under that limit
 |-------|----------------------------------------------------------|-----------------|---------|
 | Q-001 | Is `26CE:0A0B` the Roccat dongle?                        | 2026-04-17      | F-010   |
 | Q-005 | What do `0xA0`–`0xAA` opcodes on `26CE:01A2` control?   | 2026-04-17 (OOS)| F-010   |
+| Q-009 | Swarm USB traffic capture — viable approach?             | 2026-04-17 (CLOSED) | F-017 |
 
 ---
 
@@ -306,3 +337,6 @@ commands. Any raw capture session must be designed to stay well under that limit
 | 2026-04-17 | Q-001 RESOLVED via unplug test (F-010); Q-005 marked out of scope; Q-003 elevated to CRITICAL; Q-006 elevated to Medium; Q-002 revised to reflect confirmed dongle identity |
 | 2026-04-17 | Session 3: Q-008 added (CRITICAL — dongle recovery); Q-009 added (HIGH — Swarm protocol capture); Q-003 updated with F-016 context (must test with active headset connection); Q-004 downgraded to Low with revised beep hypothesis |
 | 2026-04-17 | Session 4: Q-008 updated (second crash confirmed F-022; recovery steps revised for F-018 circular dependency); Q-009 CLOSED (Swarm cannot detect 26CE:0A0B per F-017); Q-010 added (firmware binary acquisition); Q-011 added (raw response capture via ReadFile/libusb) |
+| 2026-04-17 | Session 5: Q-010 updated with confirmed CDN URL pattern (F-024) and Swarm II dead-end (F-023); Q-011 updated with OVERLAPPED I/O approach and revised crash model (F-025: single output report crashes firmware); Q-009 added to resolved table |
+| 2026-04-17 | Session 6: Q-011 completely reframed — OVERLAPPED I/O abandoned; goal is now bootloader VID:PID identification after DFU mode entry (F-026); DFU scan procedure documented |
+| 2026-04-17 | Session 7: Q-008 updated — new failure mode (F-027: USB stack not initializing); hardware button recovery attempt (F-028) added as priority 1 step |

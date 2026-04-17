@@ -618,8 +618,330 @@ See [open_questions.md](open_questions.md) for the current question list.
 Key updates:
 1. **Q-008** (CRITICAL): Dongle crashed again (F-022). Same recovery approach applies.
 2. **Q-009** (updated): Swarm USB capture path is closed — Swarm cannot detect `26CE:0A0B`
-   (F-017). New approach: raw `ReadFile`/libusb read to capture dongle responses (Q-010).
+   (F-017). New approach: raw `ReadFile`/libusb read to capture dongle responses (Q-011).
 3. **Q-010** (NEW): Can we obtain the Elo firmware binary directly from Swarm's CDN or from
    a cached install? Needed to feed `ROCCAT_Recover_Tool.exe` and for binary analysis.
 4. **Q-011** (NEW): Raw response bytes — what does the dongle actually send back? Need
    `ReadFile` or libusb read to bypass hidapi parsing.
+
+---
+
+## Session 5 — 2026-04-17
+
+### F-023 — Swarm II (Turtle Beach) also ships no device firmware; different product family
+
+**Phase:** CDN research — Turtle Beach Swarm II evaluation
+
+Swarm II v1.0.0.38 was downloaded directly from the Turtle Beach CDN:
+`https://acpv.prod.turtlebeach.com/support/generated/software/0-319/Swarm-II.zip`
+
+NSIS installer was extracted. Contents:
+- `QT_LIBRARY` — Qt runtime components
+- `SWARM_II` metadata and application binaries
+
+**No device firmware was bundled.** Like Roccat Swarm, Swarm II delivers device modules
+(including firmware) via runtime CDN download rather than shipping them in the installer.
+
+Swarm II is the Turtle Beach-rebranded replacement for Roccat Swarm following the 2019
+acquisition. It does not carry Roccat device modules — it covers Turtle Beach peripherals.
+It has no relevance to the `26CE:0A0B` dongle and is out of scope for firmware acquisition.
+
+**Significance:** Eliminates Swarm II as an alternative firmware acquisition path. The
+original Roccat Swarm CDN (`acpv.prod.turtlebeach.com`) remains the only identified source
+for the Elo device module, but the download requires a module ID (not a PID directly) — see
+F-024.
+
+**Confidence:** confirmed — installer contents observed directly
+
+---
+
+### F-024 — CDN URL pattern identified; module ID mapping is the missing link
+
+**Phase:** CDN and Swarm protocol research
+
+The Swarm module download URL pattern was identified:
+
+```
+https://acpv.prod.turtlebeach.com/swarm1/form/%1
+```
+
+The `%1` parameter is a **module ID** drawn from Swarm's internal `version.ini` file, which
+contains numbered sections (e.g., `[18]`, `[13]`) mapping device families to module IDs.
+The module ID is **not** the device PID directly — there is an internal lookup table that
+maps PID → module ID.
+
+**What this means for firmware acquisition (Q-010):**
+- The firmware binary for the Elo headset is at a URL of the form
+  `https://acpv.prod.turtlebeach.com/swarm1/form/<elo_module_id>`
+- The Elo module ID must be extracted from `version.ini` inside a Swarm installation that
+  still has the Elo device listed — likely only in Swarm versions predating the `26CE`
+  VID migration, or from a `version.ini` obtained from a system where Swarm detected the
+  dongle as `1E7D:3A37`
+- Alternatively, the numbered sections of `version.ini` may be enumerable (small integer
+  range); brute-forcing `[1]` through `[100]` against the CDN endpoint may reveal the Elo
+  module
+
+**Confidence:** confirmed for URL pattern; speculative for module ID enumeration approach
+
+---
+
+### F-025 — Third dongle crash: single WriteFile command crashes firmware; HID output handler is fatally broken
+
+**Phase:** Raw Windows API probe using WriteFile/ReadFile
+
+A single HID output report was sent using Windows `WriteFile()` directly on the HID device
+handle:
+
+```
+WriteFile result: 1 (success)
+Bytes written: 2 (report ID 0x06 + 1 payload byte)
+GetLastError: 0 (no error)
+```
+
+Immediately following `WriteFile`, a `ReadFile` on the same handle returned **0 bytes**.
+The dongle dropped off USB enumeration immediately after.
+
+**What this proves:**
+
+1. `WriteFile` succeeded without error — the HID output report was **delivered to the
+   dongle's firmware** cleanly. There is no write-path issue.
+2. The dongle crashed **after receiving a single, correctly-formed HID output report**,
+   before it could send any response.
+3. The crash is triggered inside the dongle's HID output report handler, not by
+   malformed writes, not by command rate, not by the hidapi layer.
+4. `ReadFile` returning 0 bytes (not an error, just empty) with immediate USB drop means
+   the dongle firmware faults before it can write any response to the interrupt IN endpoint.
+
+**Revised crash model:**
+
+The dongle's firmware HID output report handler for Report ID `0x06` contains a fatal bug.
+When an output report is received — regardless of payload content, regardless of write
+rate — the handler faults. The dongle is effectively unable to process its own HID output
+interface. This is not a timing issue, not a command-count accumulation issue: **one
+correctly delivered report is enough to crash it**.
+
+**Implication for F-022 crash threshold:** The "~8 commands" observation from Session 4 was
+likely due to hidapi overhead or driver buffering delaying delivery. The true threshold is 1
+report ID `0x06` output report delivered to firmware.
+
+**Implication for the investigation path:** Sending HID output reports to probe the protocol
+is not viable as long as this firmware is running. The response-capture approach (Q-011)
+using OVERLAPPED I/O must set up the async `ReadFile` before issuing `WriteFile`, to have
+any chance of reading the response in the window between write and crash.
+
+**Session crash count:** The dongle has been crashed and self-recovered 4 times this session.
+Each recovery required 30 seconds to 5 minutes unplugged. The device reliably self-recovers
+via extended power-off, which is now the established recovery procedure for routine crashes.
+
+**Confidence:** confirmed — WriteFile success with immediate drop is unambiguous
+
+---
+
+## Open Items After Session 5
+
+See [open_questions.md](open_questions.md) for the current question list.
+
+Key updates:
+1. **F-025 revises the crash model:** A single delivered output report crashes the dongle.
+   F-022's "~8 command" threshold was an artifact of the hidapi layer; the true threshold
+   is 1. All probe strategies must account for this.
+2. **Q-011 approach updated:** OVERLAPPED I/O (async `ReadFile` issued before `WriteFile`)
+   is now the primary next step — the only window to capture response bytes is the brief
+   interval between the dongle receiving the write and crashing.
+3. **Q-010 path narrowed:** CDN URL pattern confirmed (F-024); the missing piece is the
+   Elo module ID from `version.ini`. Enumeration or community sourcing needed.
+4. **Dongle recovery is routine:** 4 crashes this session, all self-recovered with 30s–5min
+   power-off. Extended power-off is now the standard recovery procedure — replace dongle
+   only if self-recovery stops working.
+
+---
+
+## Session 6 — 2026-04-17
+
+### F-026 — CRITICAL REFRAME: "crashes" are DFU mode entry; dongle firmware is not broken
+
+**Phase:** Static analysis — `firmware_upgrade.dll` string extraction
+
+Deep string analysis of `firmware_upgrade.dll` from the Swarm installation reveals the
+complete DFU firmware update protocol for this dongle family. This finding retroactively
+reinterprets every prior "crash" event (F-005, F-013, F-022, F-025).
+
+#### DFU command assignments
+
+| Byte | Role | Evidence string |
+|------|------|-----------------|
+| `0x06` | Enter DFU / bootloader mode | `"Try to start DFU mode failed, 0x06 command failed"` |
+| `0x07` | Check DFU status / reboot FW | `"Try to reboot FW, 0x07 command failed"`, `"Check DFU status 0x07 command failed"` |
+
+**Report ID `0x06` on Interface 6 is the DFU mode-entry command.** Every time we sent an
+HID output report with report ID `0x06` — which is the only output report the device
+advertises — we were issuing a DFU mode-entry command. The dongle was obeying, not crashing.
+
+#### DFU re-enumeration flow (from strings)
+
+```
+1. "Headset in app mode, change to bootloader mode"
+2. "Send mode change command"          ← WriteFile(report_id=0x06)
+3. Device drops off USB                ← what we observed and called a "crash"
+4. "Enum bootloader mode device"       ← device re-enumerates as a DIFFERENT VID:PID
+5. "Device is in bootloader mode"
+6. Open new HID handle to bootloader device
+7. Flash firmware via DFU protocol (Dongle_DFU.dll)
+8. "Now waiting device re-boot from bootloader mode"
+9. Command 0x07 → reboot to app mode
+```
+
+The dongle has been entering DFU/bootloader mode successfully every time we sent a command.
+We interpreted step 3 as a crash because we never polled for a new USB device after the
+drop. The bootloader device is sitting there waiting; we just never looked for it.
+
+#### Additional strings of significance
+
+**Device and model confirmation:**
+- `"3A37"` — explicit PID string; confirms Elo support in this DLL
+- `"Elo Air"` — explicit product name string
+
+**Multi-chip update architecture:**
+- `"Dongle_DFU.dll"` — separate DLL handles dongle DFU; `firmware_upgrade.dll` is the
+  orchestrator
+- `CFirmware_upgrade::set_pid(VID, PID, type)` — `firmware_upgrade.ini` maps VID:PID pairs
+  to firmware files and updater types
+- Chip-specific updaters present in the same package:
+
+| Updater reference | Chip family | Typical use in Roccat products |
+|-------------------|-------------|-------------------------------|
+| PIC32             | Microchip PIC32 | Dongle application MCU  |
+| Holtek            | Holtek HT32 | Mice, keyboards            |
+| CMedia            | C-Media     | USB audio codec            |
+| ATTiny            | Atmel ATtiny | Small MCU (sensors, etc.) |
+| nRF               | Nordic nRF5x | BLE/RF wireless MCU        |
+
+The nRF reference is particularly significant — the headset's wireless RF link is likely
+handled by a Nordic nRF5x chip. The nRF DFU utility is invoked as
+`"dfu usb-serial --package"`, meaning the headset itself (not just the dongle) can receive
+firmware updates over USB cable in a separate flow.
+
+**Wireless headset update flow (from strings):**
+`"Since the %1 is wireless, its firmware needs to be updated via USB cable. First update
+the dongle, then connect the %2 via cable and update it afterwards."`
+
+This confirms a two-phase update: dongle via DFU (PIC32/Dongle_DFU.dll), then headset
+earbud via USB cable (nRF DFU over serial).
+
+#### Retroactive reinterpretation of prior findings
+
+| Prior finding | What we thought | What actually happened |
+|---------------|-----------------|------------------------|
+| F-005 | Crash from write storm | Multiple DFU mode entries from rapid commands |
+| F-013 | CM_PROB_PHANTOM persistent crash | Dongle in DFU bootloader mode; different VID:PID not scanned |
+| F-022 | Crash threshold ~8 commands | ~8 DFU entries before extended power-off required |
+| F-025 | Single WriteFile crashes firmware | Single WriteFile correctly entered DFU mode |
+
+The dongle firmware is **not broken**. The HID output report handler works exactly as
+designed. Report ID `0x06` is specifically the DFU mode-entry command, and the dongle
+executes it faithfully every time.
+
+The "recovery via 30s–5min power-off" is simply the DFU bootloader timing out and
+rebooting to app mode when it receives no firmware image.
+
+#### Immediate next step
+
+After sending one `WriteFile(report_id=0x06)` to trigger DFU mode entry, immediately scan
+all USB devices for a new VID:PID that was not present before. The bootloader device will
+appear on the bus — likely with either:
+- A Realtek DFU VID:PID (if Realtek chip handles USB in bootloader mode)
+- A PIC32 bootloader VID:PID (`04D8:xxxx` — Microchip's registered VID)
+- The same `26CE:0A0B` VID:PID but with a different bcdDevice revision
+
+Once the bootloader device is identified, the full DFU flashing path becomes available —
+either for firmware recovery or for firmware analysis.
+
+**Confidence:** confirmed for DFU command assignments and re-enumeration flow (from explicit
+strings); speculative for bootloader VID:PID (not yet observed directly)
+
+---
+
+## Session 7 — 2026-04-17
+
+### F-027 — Dongle USB stack not initializing; LED active but no USB enumeration
+
+**Phase:** Hardware recovery — post cap-drain attempt
+
+After capacitor drain (VCC/GND pins shorted while unplugged) and multiple port changes, the
+dongle presents this state:
+
+- LED illuminates white on plug-in — MCU is running and executing boot code
+- Device does **not** appear in Windows PnP (`Get-PnpDevice`)
+- Device does **not** appear in HID enumeration
+- Device does **not** appear in libusb device list
+- No unknown devices, no error devices, no partial enumerations visible anywhere
+
+The LED confirms the microcontroller is powered and has reached at least its GPIO
+initialization code. The complete absence of USB enumeration — not even a partial or
+errored descriptor exchange — means the USB stack never starts. At this stage the chip is
+not asserting D+ or D-, or is doing so without valid descriptor responses.
+
+**Most likely cause:** The dongle's application firmware is corrupted or stuck in a state
+where the USB peripheral is never initialized. This is distinct from a DFU bootloader
+timeout state (where the device would still enumerate, just as a different VID:PID). The
+chip has booted but is running code that does not reach the USB initialization routine —
+or has reached a fault handler that halts before USB init.
+
+**What this rules out:**
+- Simple DFU bootloader timeout: those states still enumerate on USB
+- Power supply problem: LED proves adequate power
+- Host-side USB controller issue: confirmed on multiple ports
+
+**What this does not rule out:**
+- Physical button-triggered hardware bootloader (F-028) — if the chip has a ROM-level boot
+  mode select, it would be entirely independent of the corrupted application firmware
+- The corrupted firmware is a new state distinct from prior DFU timeout states — prior
+  "crashes" involved the dongle successfully re-enumerating as a DFU device; this failure
+  mode is deeper
+
+**Confidence:** confirmed — LED active, USB silent, observed across multiple ports
+
+---
+
+### F-028 — Physical reset button discovered; may trigger ROM-level bootloader
+
+**Phase:** Hardware inspection
+
+A physical button (pinhole or tactile switch) was found on the dongle body. This is
+significant because many USB microcontrollers implement a **hardware boot mode select**
+that is entirely independent of application firmware:
+
+| MCU family | Hardware boot mechanism |
+|------------|------------------------|
+| STM32 | BOOT0 pin held HIGH at reset → ROM DFU bootloader (ST VID `0483`, DFU PID `DF11`) |
+| PIC32 | MCLR + specific pin state at reset → ICSP/bootloader mode |
+| Nordic nRF52 | GPIO + reset → open bootloader mode |
+| Realtek USB audio | Vendor-specific — some support pin-triggered USB recovery mode |
+
+**Procedure being attempted:** Hold the button while plugging in USB power. This is the
+standard recovery entry method for devices with hardware boot mode select. If the button
+is wired to a BOOT pin or serves as a reset-with-mode-select, it would:
+
+1. Bypass the corrupted application firmware entirely
+2. Enter a factory ROM bootloader that enumerates independently of app flash contents
+3. Present a new USB device (typically a DFU or UART-serial interface) for reflashing
+
+**Why this could be the key to everything:**
+
+If successful, the ROM bootloader would:
+- Resolve F-027 by providing a working USB interface regardless of app firmware state
+- Resolve Q-008 (dongle recovery) without needing Swarm, CDN firmware, or any prior
+  tooling — ROM bootloaders accept raw firmware images over standard protocols
+- Potentially expose the firmware binary via memory readback (if the bootloader permits it)
+- Allow flashing of known-good firmware to restore normal operation permanently
+
+**If the button does NOT work as a hardware boot select:**
+- It may be a pairing reset button (clears RF pairing state only, not firmware)
+- It may be a factory reset button that triggers a soft reset via firmware (which won't
+  help if firmware is not reaching USB init)
+- It may be wired to a physical reset line that performs the same reset as power-cycling
+
+**Current status:** Test in progress. Result to be documented as a follow-on finding.
+
+**Confidence:** speculative — hardware button function unconfirmed; bootloader entry
+hypothesis is plausible based on common MCU design patterns
