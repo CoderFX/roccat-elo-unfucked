@@ -1,0 +1,257 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<SWARM>
+	<LANGUAGES>
+		<LANGUAGE name="English" id="0" file="english"/>
+		<LANGUAGE name="繁體中文" id="1" file="chinese"/>
+		<LANGUAGE name="简体中文" id="2" file="china"/>
+		<LANGUAGE name="Russie" id="3" file="russian"/>
+		<LANGUAGE name="Deutsch" id="4" file="germany"/>
+		<LANGUAGE name="Français" id="5" file="france"/>
+		<LANGUAGE name="Espagnol" id="6" file="spain"/>
+		<LANGUAGE name="Portugais" id="7" file="portuguese"/>
+		<LANGUAGE name="Danske" id="8" file="danish"/>
+		<LANGUAGE name="Suomi" id="9" file="finnish"/>
+		<LANGUAGE name="Italiano" id="10" file="italian"/>
+		<LANGUAGE name="日本語" id="11" file="japanese"/>
+		<LANGUAGE name="한국의" id="12" file="korean"/>
+		<LANGUAGE name="Polskie" id="13" file="polish"/>
+		<LANGUAGE name="Svenska" id="14" file="swedish"/>
+		<LANGUAGE name="ไทย" id="15" file="thai"/>
+		<LANGUAGE name="Tiếng Việt" id="16" file="vietnamese"/>
+	</LANGUAGES>
+	
+	<PRODUCTS>
+		<PRODUCT dll_name="MONITOR" type="0" pid="0x0" alias_name="MONITOR"/>
+		<PRODUCT dll_name="SWARM" type="1" pid="0x0" alias_name="SWARM" release="1"/>
+		<PRODUCT dll_name="KILL_PROCESS" type="2" pid="0x0" alias_name="KILL_PROCESS"/>
+        <PRODUCT dll_name="FIRMWARE_UPDATE" type="3" pid="0x0" alias_name="FIRMWARE_UPDATE"/>
+		<PRODUCT dll_name="SWARM_CONNECT" type="4" pid="0x0004" alias_name="SWARM_CONNECT" release="1"/>
+		<PRODUCT dll_name="UPGRADE_INSTALL" type="5" pid="0x0" alias_name="UPGRADE_INSTALL"/>		
+		<PRODUCT dll_name="TALK_FX" type="6" pid="0x2712" alias_name="TALK_FX" release="1"/>
+		<PRODUCT dll_name="ALIENFX™" type="7" pid="0x2713" alias_name="ALIEN_FX" release="1"/>
+		<PRODUCT dll_name="AIMO" type="27" pid="0x0" alias_name="AIMO"/>		
+		<PRODUCT dll_name="WAVES_DRIVER" type="73" pid="0x2714" alias_name="WAVES_DRIVER" release="1"/>
+		
+		<PRODUCT dll_name="NYTH" type="8" pid="0x2E7C" alias_name="NYTH_BLACK" disp_name="NYTH" release="1" device_type="0" macro="0x0" auto_unplug_plugin="1"/>
+		<PRODUCT dll_name="NYTH" type="9" pid="0x2E7D" alias_name="NYTH_WHITE" disp_name="NYTH" release="1" device_type="0" macro="0x0" auto_unplug_plugin="1"/>
+		<PRODUCT dll_name="KOVA" type="10" pid="0x2CEE" alias_name="KOVA_GRAY" disp_name="KOVA" release="1" device_type="0" macro="0x0" auto_unplug_plugin="1"/>
+		<PRODUCT dll_name="KOVA" type="11" pid="0x2CEF" alias_name="KOVA_WHITE" disp_name="KOVA" release="1" device_type="0" macro="0x0" auto_unplug_plugin="1"/>
+		<PRODUCT dll_name="KIRO" type="12" pid="0x2C38" alias_name="KIRO" disp_name="KIRO" release="1" device_type="0" macro="0x0" auto_unplug_plugin="1"/>						
+		<PRODUCT dll_name="RYOS_MK_FX" type="13" pid="0x2FDA" alias_name="RYOS_MK_FX" disp_name="RYOS_MK_FX" release="1" device_type="1" macro="0x0" auto_unplug_plugin="0"/>
+		<PRODUCT dll_name="SOVA_MEMBRANE" type="14" pid="0x2F76" alias_name="SOVA_MEMBRANE" disp_name="SOVA_MEMBRANE" release="1" device_type="1" macro="0x0" auto_unplug_plugin="0"/>
+		<PRODUCT dll_name="SUORA" type="15" pid="0x2FA8" updating_pid="0x8022" alias_name="SUORA" disp_name="SUORA" release="1" device_type="1" macro="0x0" auto_unplug_plugin="1"/>
+		<PRODUCT dll_name="SOVA_MECHANICAL" type="16" pid="0x2F94" alias_name="SOVA_MECHANICAL" disp_name="SOVA_MECHANICAL" release="1" device_type="1" macro="0x0" auto_unplug_plugin="0"/>
+		<PRODUCT dll_name="SKELTR" type="17" pid="0x2FC6" alias_name="SKELTR" disp_name="SKELTR" release="1" device_type="1" macro="0x0" auto_unplug_plugin="0"/>
+		<PRODUCT dll_name="KOVA" type="18" pid="0x2CF0" alias_name="KOVA_BLACK" disp_name="KOVA" release="1" device_type="0" macro="0x0" auto_unplug_plugin="1"/>
+		<PRODUCT dll_name="KONE_EMP" type="19" pid="0x2E24" alias_name="KONE_EMP" disp_name="KONE_EMP" release="1" device_type="0" macro="0x0" auto_unplug_plugin="1"/>		
+        <PRODUCT dll_name="SUORA_FX" type="20" pid="0x3246" updating_pid="0x3247" alias_name="SUORA_FX" disp_name="SUORA_FX" release="1" device_type="1" macro="0x0" auto_unplug_plugin="1"/>
+		<PRODUCT dll_name="LEADR" type="21" pid="0x2E4C" updating_pid="0x2E4D" alias_name="LEADR" disp_name="LEADR" release="1" device_type="0" macro="0x3" auto_unplug_plugin="1"/>
+		<PRODUCT dll_name="LEADR" type="22" pid="0x2E4E" updating_pid="0x2E4F" alias_name="LEADR_STAND" disp_name="LEADR_STAND" release="1" device_type="0" macro="0x3" auto_unplug_plugin="1"/>
+		<PRODUCT dll_name="ISKU+" type="23" pid="0x31E2" alias_name="ISKU+" disp_name="ISKU+" release="1" device_type="1" macro="0x0" auto_unplug_plugin="0"/>	
+		<PRODUCT dll_name="ISKU+_FORCE_FX" type="24" pid="0x3214" alias_name="ISKU+_FORCE_FX" disp_name="ISKU+_FORCE_FX" release="1" device_type="1" macro="0x0" auto_unplug_plugin="0"/>	
+		<PRODUCT dll_name="KONE_PURE_OWL-EYE" type="25" pid="0x2DCD" alias_name="KONE_PURE_OWL-EYE" disp_name="KONE_PURE_OWL-EYE" release="1" device_type="0" macro="0x3" auto_unplug_plugin="1"/>			
+		<PRODUCT dll_name="KONE_AIMO" type="26" pid="0x2E27" alias_name="KONE_AIMO" disp_name="KONE_AIMO" release="1" device_type="0" macro="0x3" auto_unplug_plugin="1"/>					
+		<PRODUCT dll_name="2DD7" type="28" pid="0x2DD7" updating_pid="0xA276" alias_name="2DD7" disp_name="KONE_PURE_ULTRA_iCafe" release="1" device_type="0" macro="0x3" auto_unplug_plugin="1"/>		
+		<PRODUCT dll_name="KONE_PURE_SE" type="29" pid="0x2DCA" updating_pid="0x2DCA" alias_name="KONE_PURE_SE" disp_name="KONE_PURE_SE" release="1" device_type="0" macro="0x0" auto_unplug_plugin="1"/>
+		<PRODUCT dll_name="KHAN_AIMO" type="30" pid="0x39D0" updating_pid="0x39D1" alias_name="KHAN_AIMO" disp_name="KHAN_AIMO" release="1" device_type="2" macro="0x0" auto_unplug_plugin="0"/>
+		<PRODUCT dll_name="HORDE" type="31" pid="0x300C" alias_name="HORDE" disp_name="HORDE" release="1" device_type="1" macro="0x3" auto_unplug_plugin="1"/>
+		<PRODUCT dll_name="HORDE_AIMO" type="32" pid="0x303E" alias_name="HORDE_AIMO" disp_name="HORDE_AIMO" release="1" device_type="1" macro="0x3" auto_unplug_plugin="1"/>		
+		<PRODUCT dll_name="VULCAN_80" type="33" pid="0x305C" alias_name="VULCAN_80" disp_name="VULCAN_80" release="1" device_type="1" macro="0x3" auto_unplug_plugin="0"/>		
+		<PRODUCT dll_name="VULCAN" type="34" pid="0x307A" alias_name="VULCAN_100_AIMO" disp_name="VULCAN_100_AIMO" release="1" device_type="1" macro="0x3" auto_unplug_plugin="0"/>
+		<PRODUCT dll_name="VULCAN" type="35" pid="0x3098" alias_name="VULCAN_AIMO" disp_name="VULCAN_AIMO" release="1" device_type="1" macro="0x3" auto_unplug_plugin="0"/>
+		<PRODUCT dll_name="VULCAN" type="36" pid="0x2FEE" alias_name="VULCAN_TKL" disp_name="VULCAN_TKL" release="1" device_type="1" macro="0x3" auto_unplug_plugin="0" swarm2="1"/>
+		<PRODUCT dll_name="KONE_PURE_SEL" type="37" pid="0x2DCB" updating_pid="0x2DCB" alias_name="KONE_PURE_SEL" disp_name="KONE_PURE_SEL" release="1" device_type="0" macro="0x0" auto_unplug_plugin="1"/>						
+		<PRODUCT dll_name="KOVA_AIMO" type="38" pid="0x2CF1" alias_name="KOVA_AIMO_BLACK" disp_name="KOVA_AIMO" release="1" device_type="0" macro="0x3" auto_unplug_plugin="1"/>
+		<PRODUCT dll_name="KOVA_AIMO" type="39" pid="0x2CF2" alias_name="KOVA_AIMO_GREY" disp_name="KOVA_AIMO" release="0" device_type="0" macro="0x3" auto_unplug_plugin="1"/>		
+		<PRODUCT dll_name="KOVA_AIMO" type="40" pid="0x2CF3" alias_name="KOVA_AIMO_WHITE" disp_name="KOVA_AIMO" release="1" device_type="0" macro="0x3" auto_unplug_plugin="1"/>	
+		<PRODUCT dll_name="KAIN" type="41" pid="0x2D00" updating_pid="0xA273" alias_name="KAIN_100" disp_name="KAIN_100_AIMO" release="1" device_type="0" macro="0x3" auto_unplug_plugin="1"/>
+		<PRODUCT dll_name="KAIN" type="42" pid="0x2D5C" updating_pid="0xA272" alias_name="KAIN_120" disp_name="KAIN_120_AIMO" release="1" device_type="0" macro="0x3" auto_unplug_plugin="1"/>
+		<PRODUCT dll_name="KAIN_200" type="43" pid="0x2D5F" updating_pid="0x5078" alias_name="KAIN_200" disp_name="KAIN_200_AIMO" release="1" device_type="0" macro="0x3" auto_unplug_plugin="1"/>
+		<PRODUCT dll_name="AIMO_PAD" type="44" pid="0x343A" updating_pid="0xA271" alias_name="AIMO_PAD" disp_name="SENSE_AIMO" release="1" device_type="3" macro="0x0" auto_unplug_plugin="1"/>
+		<PRODUCT dll_name="AIMO_PAD_WIDE" type="45" pid="0x343B" updating_pid="0xA274" alias_name="AIMO_PAD_WIDE" disp_name="SENSE_AIMO_WIDE" release="1" device_type="3" macro="0x0" auto_unplug_plugin="1" swarm2="1"/>
+		<PRODUCT dll_name="2DD2" type="46" pid="0x2DD2" updating_pid="0xA275" alias_name="2DD2" disp_name="KONE_PURE_ULTRA" release="1" device_type="0" macro="0x3" auto_unplug_plugin="1"/>		
+		<PRODUCT dll_name="KONE_AIMO" type="47" pid="0x2E2C" alias_name="KONE_AIMO_16K" disp_name="KONE_AIMO" release="1" device_type="0" macro="0x3" auto_unplug_plugin="1"/>			
+		<PRODUCT dll_name="KAIN_200" type="48" pid="0x2D60" updating_pid="0x00B3" alias_name="KAIN_200_DONGLE" disp_name="KAIN_200_AIMO" release="1" device_type="0" macro="0x3" auto_unplug_plugin="1"/>
+		<PRODUCT dll_name="KHAN_AIMO" type="49" pid="0x3A34" updating_pid="0x3A34" alias_name="3A34" disp_name="ELO_USB" release="1" device_type="2" macro="0x0" auto_unplug_plugin="0"/>
+		<PRODUCT dll_name="3A39" type="50" pid="0x3A39" updating_pid="0x3A38" alias_name="3A39" disp_name="ELO_AIR" release="1" device_type="2" macro="0x0" auto_unplug_plugin="1"/>
+		<PRODUCT dll_name="BURST" type="51" pid="0x2DE6" updating_pid="0xA278" alias_name="2DE6" disp_name="BURST_CORE" release="1" device_type="0" macro="0x3" auto_unplug_plugin="1"/>
+		<PRODUCT dll_name="3A37" type="52" pid="0x3A37" updating_pid="0x3A36" alias_name="3A37" disp_name="ELO_AIR" release="1" device_type="2" macro="0x0" auto_unplug_plugin="1"/>
+		<PRODUCT dll_name="BURST" type="53" pid="0x2DE1" updating_pid="0xA277" alias_name="2DE1" disp_name="BURST_PRO" release="1" device_type="0" macro="0x3" auto_unplug_plugin="1"/>
+		<PRODUCT dll_name="VULCAN_PRO" type="54" pid="0x311A" updating_pid="0xA27A" alias_name="VULCAN_TKL_PRO" disp_name="VULCAN_TKL_PRO" release="1" device_type="1" macro="0x3" auto_unplug_plugin="1"/>
+		<PRODUCT dll_name="VULCAN_PRO" type="55" pid="0x30F7" updating_pid="0xA27B" alias_name="VULCAN_PRO" disp_name="VULCAN_PRO" release="1" device_type="1" macro="0x3" auto_unplug_plugin="1"/>
+		<PRODUCT dll_name="2C88" type="56" pid="0x2C88" updating_pid="0xA279" alias_name="2C88" disp_name="KONE_PRO" release="1" device_type="0" macro="0x3" auto_unplug_plugin="1"/>
+		<PRODUCT dll_name="2C92" type="57" pid="0x2C92" updating_pid="0x2C8C" alias_name="2C92" disp_name="KONE_PRO_AIR" release="1" device_type="0" macro="0x3" auto_unplug_plugin="1"/>
+		<PRODUCT dll_name="2C8E" type="58" pid="0x2C8E" updating_pid="0x2C8F" alias_name="2C8E" disp_name="KONE_PRO_AIR" release="1" device_type="0" macro="0x3" auto_unplug_plugin="1"/>
+		<PRODUCT dll_name="PYRO" type="59" pid="0x314C" updating_pid="0xA27E" alias_name="PYRO" disp_name="PYRO" release="1" device_type="1" macro="0x3" auto_unplug_plugin="1"/>
+		<PRODUCT dll_name="MAGMA" type="60" pid="0x3124" updating_pid="0xA27D" alias_name="MAGMA" disp_name="MAGMA" release="1" device_type="1" macro="0x3" auto_unplug_plugin="1" swarm2="0"/>
+		<PRODUCT dll_name="KONE_XP" type="61" pid="0x2C8B" updating_pid="0xA27C" alias_name="KONE_XP" disp_name="KONE_XP" release="1" device_type="0" macro="0x3" auto_unplug_plugin="1"/>
+		<PRODUCT dll_name="BURST_PRO_AIR" type="62" pid="0x2CAB" alias_name="BURST_PRO_AIR" disp_name="BURST_PRO_AIR" release="1" device_type="0" macro="0x3" auto_unplug_plugin="1"/>
+		<PRODUCT dll_name="BURST_PRO_AIR" type="63" pid="0x2CA6" updating_pid="0x2CA7" alias_name="BURST_PRO_AIR_DONGLE" disp_name="BURST_PRO_AIR" release="1" device_type="0" macro="0x3" auto_unplug_plugin="1"/>
+		<PRODUCT dll_name="VULCAN_PRO" type="64" pid="0x3167" updating_pid="0xA2B6" alias_name="VULCAN_TKL_PRO_JP" disp_name="VULCAN_TKL_PRO" release="1" device_type="1" macro="0x3" auto_unplug_plugin="1"/>
+		<PRODUCT dll_name="VULCAN_II_MINI" type="65" pid="0x2F09" updating_pid="0xA2B5" alias_name="VULCAN_II_MINI" disp_name="VULCAN_II_MINI" release="1" device_type="1" macro="0x3" auto_unplug_plugin="1" swarm2="0"/>
+		<PRODUCT dll_name="SYN_SERIES" type="66" pid="0x3A41" updating_pid="0x3A40" alias_name="SYN_MAX_AIR" disp_name="SYN_MAX_AIR" release="0" device_type="2" macro="0x3" auto_unplug_plugin="1"/>
+		<PRODUCT dll_name="SYN_SERIES" type="67" pid="0x3A3F" updating_pid="0x3A3E" alias_name="SYN_MAX_AIR_DOCK" disp_name="SYN_MAX_AIR" release="0" device_type="2" macro="0x3" auto_unplug_plugin="1"/>
+		<PRODUCT dll_name="VULCAN_II_MAX" type="68" pid="0x2EE2" updating_pid="0xA2B4" alias_name="VULCAN_II_MAX" disp_name="VULCAN_II_MAX" release="1" device_type="1" macro="0x3" auto_unplug_plugin="1" swarm2="1"/>		
+		<PRODUCT dll_name="KONE_XP_AIR" type="69" pid="0x2CB2" alias_name="KONE_XP_AIR" disp_name="KONE_XP_AIR" release="1" device_type="0" macro="0x3" auto_unplug_plugin="1" swarm2="1"/>
+		<PRODUCT dll_name="KONE_XP_AIR" type="70" pid="0x2CB6" updating_pid="0x2CB7" alias_name="KONE_XP_AIR_DONGLE" disp_name="KONE_XP_AIR" release="1" device_type="0" macro="0x3" auto_unplug_plugin="1" swarm2="1"/>
+		<PRODUCT dll_name="KONE_XP_AIR_DOCK" type="71" pid="0x2CB8" updating_pid="0xA2B7" alias_name="KONE_XP_AIR_DOCK" disp_name="KONE_XP_AIR" release="1" device_type="3" macro="0x3" auto_unplug_plugin="1" swarm2="1"/>
+		
+		<PRODUCT dll_name="KONE_AIR" type="72" pid="0xAFCA" updating_pid="0xB091" alias_name="KONE_AIR" disp_name="KONE_AIR" release="1" device_type="0" macro="0x3" auto_unplug_plugin="1"/>
+		<PRODUCT dll_name="SYN_SERIES" type="74" pid="0x3A3D" updating_pid="0x3A3C" alias_name="SYN_PRO_AIR" disp_name="SYN_PRO_AIR" release="0" device_type="2" macro="0x3" auto_unplug_plugin="1"/>
+		<PRODUCT dll_name="SYN_SERIES" type="75" pid="0x3A3B" updating_pid="0x3A3A" alias_name="SYN_PRO_AIR_DONGLE" disp_name="SYN_PRO_AIR" release="0" device_type="2" macro="0x3" auto_unplug_plugin="1"/>	
+		<PRODUCT dll_name="KONE_AIR" type="76" pid="0xAFC9" updating_pid="0xB091" alias_name="KONE_AIR" disp_name="KONE_AIR_BT" release="1" device_type="0" macro="0x3" auto_unplug_plugin="1"/>		
+		<PRODUCT dll_name="VULCAN_II" type="77" pid="0x2F4E" updating_pid="0xA2B8" alias_name="VULCAN_II" disp_name="VULCAN_II" release="0" device_type="1" macro="0x3" auto_unplug_plugin="1" swarm2="1"/>	
+		<PRODUCT dll_name="MAGMA_MINI" type="78" pid="0x69A0" updating_pid="0xA2B9" alias_name="MAGMA_MINI" disp_name="MAGMA_MINI" release="1" device_type="1" macro="0x3" auto_unplug_plugin="1" swarm2="1"/>
+		<PRODUCT dll_name="TORCH" type="79" pid="0x3A56" updating_pid="0x0000" alias_name="TORCH" disp_name="TORCH" release="1" device_type="2" macro="0x3" auto_unplug_plugin="0"/>	
+		<PRODUCT dll_name="VULCAN_II_MINI_AIR" type="80" pid="0x6978" updating_pid="0x697B" alias_name="VULCAN_II_MINI_AIR" disp_name="VULCAN_II_MINI_AIR" release="0" device_type="1" macro="0x3" auto_unplug_plugin="1" swarm2="1"/>
+		<PRODUCT dll_name="VULCAN_II_MINI_AIR" type="81" pid="0x3AA9" updating_pid="0x6979" alias_name="VULCAN_II_MINI_AIR_DONGLE" disp_name="VULCAN_II_MINI_AIR" release="0" device_type="1" macro="0x3" auto_unplug_plugin="1" swarm2="1"/>
+		<PRODUCT dll_name="PURE_SEL" type="82" pid="0x2CC8" updating_pid="0x2CC9" alias_name="PURE_SEL" disp_name="PURE_SEL" release="0" device_type="0" macro="0x3" auto_unplug_plugin="1" swarm2="1"/>
+		<PRODUCT dll_name="PURE_AIR" type="83" pid="0x2CCC" updating_pid="0x2CCC" alias_name="PURE_AIR" disp_name="PURE_AIR" release="0" device_type="0" macro="0x3" auto_unplug_plugin="1" swarm2="1"/>
+		<PRODUCT dll_name="PURE_AIR" type="84" pid="0x3C6E" updating_pid="0x3C6E" alias_name="PURE_AIR_DONGLE" disp_name="PURE_AIR" release="0" device_type="0" macro="0x3" auto_unplug_plugin="1" swarm2="1"/>
+
+		
+	</PRODUCTS>
+	<!--device_type: 0 = mouse, 1 = keyboard, 2 = headset, 3 = mousepad -->
+	<!--macro 0x0:EXECUTE_ON_PRESS, 0x01:EXECUTE_WHILE_PRESSING, 0x02:EXECUTE_INFINITE
+		3 = EXECUTE_ON_PRESS and EXECUTE_WHILE_PRESSING and EXECUTE_INFINITE
+	-->
+	
+	<MACRO_KEY_COUNT>	
+		<MACRO_KEY_COUNT type="13" count="112"/>			
+		<MACRO_KEY_COUNT type="15" count="160"/>				
+		<MACRO_KEY_COUNT type="17" count="36"/>					
+		<MACRO_KEY_COUNT type="14" count="40"/>					
+		<MACRO_KEY_COUNT type="16" count="40"/>					
+		<MACRO_KEY_COUNT type="20" count="126"/>				
+		<MACRO_KEY_COUNT type="23" count="36"/>					
+		<MACRO_KEY_COUNT type="24" count="36"/>							
+		<MACRO_KEY_COUNT type="28" count="30"/>															
+		<MACRO_KEY_COUNT type="31" count="32"/>									
+		<MACRO_KEY_COUNT type="32" count="32"/>											
+		<MACRO_KEY_COUNT type="33" count="30"/>															
+		<MACRO_KEY_COUNT type="34" count="30"/>															
+		<MACRO_KEY_COUNT type="35" count="30"/>																
+		<MACRO_KEY_COUNT type="36" count="30"/>
+		<MACRO_KEY_COUNT type="54" count="30"/>	
+		<MACRO_KEY_COUNT type="55" count="30"/>	
+		<MACRO_KEY_COUNT type="59" count="0"/>	
+		<MACRO_KEY_COUNT type="60" count="0"/>	
+		<MACRO_KEY_COUNT type="64" count="30"/>	
+		<MACRO_KEY_COUNT type="78" count="30"/>	
+	</MACRO_KEY_COUNT>		
+	
+	<AMIO_PRODUCT>
+		<PRODUCT type="26"/>
+		<PRODUCT type="30"/>
+		<PRODUCT type="32"/>	
+		<PRODUCT type="34"/>				
+		<PRODUCT type="35"/>						
+		<PRODUCT type="36"/>						
+		<PRODUCT type="38"/>						
+		<PRODUCT type="39"/>						
+		<PRODUCT type="40"/>						
+		<PRODUCT type="41"/>						
+		<PRODUCT type="42"/>						
+		<PRODUCT type="43"/>							
+		<PRODUCT type="44"/>						
+		<PRODUCT type="45"/>						
+		<PRODUCT type="46"/>				
+		<PRODUCT type="47"/>				
+		<PRODUCT type="48"/>				
+		<PRODUCT type="49"/>			
+		<PRODUCT type="50"/>				
+		<PRODUCT type="51"/>				
+		<PRODUCT type="52"/>				
+		<PRODUCT type="53"/>					
+		<PRODUCT type="54"/>				
+		<PRODUCT type="55"/>				
+		<PRODUCT type="56"/>					
+		<PRODUCT type="57"/>				
+		<PRODUCT type="58"/>			
+		<PRODUCT type="59"/>				
+		<PRODUCT type="60"/>					
+		<PRODUCT type="61"/>				
+		<PRODUCT type="62"/>				
+		<PRODUCT type="63"/>			
+		<PRODUCT type="64"/>			
+		<PRODUCT type="65"/>				
+		<PRODUCT type="66"/>					
+		<PRODUCT type="67"/>					
+		<PRODUCT type="68"/>					
+		<PRODUCT type="69"/>					
+		<PRODUCT type="70"/>						
+		<PRODUCT type="71"/>							
+		<PRODUCT type="74"/>						
+		<PRODUCT type="75"/>						
+		<PRODUCT type="77"/>	
+		<PRODUCT type="78"/>	
+		<PRODUCT type="79"/>
+		<PRODUCT type="80"/>
+		<PRODUCT type="81"/>		
+	</AMIO_PRODUCT>	
+	
+	<M_KEY_PRODUCT>
+		<PRODUCT type="13"/>
+		<PRODUCT type="17"/>
+		<PRODUCT type="23"/>
+		<PRODUCT type="24"/>		
+		<PRODUCT type="31"/>
+		<PRODUCT type="32"/>				
+	</M_KEY_PRODUCT>	
+	
+	<T_KEY_PRODUCT>
+		<PRODUCT type="13"/>
+		<PRODUCT type="17"/>
+		<PRODUCT type="23"/>
+		<PRODUCT type="24"/>		
+	</T_KEY_PRODUCT>		
+
+	<EASY_ZONE_KEY_COUNT>	
+		<EASY_ZONE_KEY_COUNT type="13" count="96"/>			
+		<EASY_ZONE_KEY_COUNT type="14" count="40"/>				
+		<EASY_ZONE_KEY_COUNT type="15" count="0"/>					
+		<EASY_ZONE_KEY_COUNT type="16" count="40"/>					
+		<EASY_ZONE_KEY_COUNT type="17" count="20"/>					
+		<EASY_ZONE_KEY_COUNT type="20" count="0"/>				
+		<EASY_ZONE_KEY_COUNT type="23" count="20"/>					
+		<EASY_ZONE_KEY_COUNT type="24" count="20"/>							
+		<EASY_ZONE_KEY_COUNT type="28" count="20"/>															
+		<EASY_ZONE_KEY_COUNT type="31" count="20"/>									
+		<EASY_ZONE_KEY_COUNT type="32" count="20"/>									
+		<EASY_ZONE_KEY_COUNT type="33" count="20"/>									
+		<EASY_ZONE_KEY_COUNT type="34" count="20"/>									
+		<EASY_ZONE_KEY_COUNT type="35" count="20"/>									
+		<EASY_ZONE_KEY_COUNT type="36" count="20"/>									
+		<EASY_ZONE_KEY_COUNT type="54" count="20"/>									
+		<EASY_ZONE_KEY_COUNT type="55" count="20"/>									
+		<EASY_ZONE_KEY_COUNT type="59" count="20"/>										
+		<EASY_ZONE_KEY_COUNT type="60" count="20"/>									
+		<EASY_ZONE_KEY_COUNT type="64" count="20"/>	
+		<EASY_ZONE_KEY_COUNT type="78" count="14"/>
+	</EASY_ZONE_KEY_COUNT>		
+
+	<EXTEND_KEY_COUNT>	
+		<EXTEND_KEY_COUNT type="13" count="0"/>			
+		<EXTEND_KEY_COUNT type="14" count="0"/>				
+		<EXTEND_KEY_COUNT type="15" count="0"/>					
+		<EXTEND_KEY_COUNT type="16" count="0"/>					
+		<EXTEND_KEY_COUNT type="17" count="0"/>					
+		<EXTEND_KEY_COUNT type="20" count="0"/>				
+		<EXTEND_KEY_COUNT type="23" count="0"/>					
+		<EXTEND_KEY_COUNT type="24" count="0"/>							
+		<EXTEND_KEY_COUNT type="28" count="6"/>															
+		<EXTEND_KEY_COUNT type="31" count="2"/>									
+		<EXTEND_KEY_COUNT type="32" count="2"/>									
+		<EXTEND_KEY_COUNT type="33" count="10"/>									
+		<EXTEND_KEY_COUNT type="34" count="10"/>									
+		<EXTEND_KEY_COUNT type="35" count="10"/>									
+		<EXTEND_KEY_COUNT type="36" count="10"/>									
+		<EXTEND_KEY_COUNT type="54" count="0"/>									
+		<EXTEND_KEY_COUNT type="55" count="0"/>									
+		<EXTEND_KEY_COUNT type="59" count="0"/>									
+		<EXTEND_KEY_COUNT type="60" count="0"/>										
+		<EXTEND_KEY_COUNT type="64" count="0"/>	
+		<EXTEND_KEY_COUNT type="78" count="0"/>	
+	</EXTEND_KEY_COUNT>		
+	
+</SWARM>
