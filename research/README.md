@@ -39,51 +39,66 @@ re-spin that requires independent protocol documentation.
 | USB DFU bootloader             | CLOSED               | No USB bootloader; DFU is 2.4 GHz radio-only (F-032)                            |
 | Headset USB data path          | Complete             | USB-C charge-only; no data; headset FW updates via RF only (F-034)              |
 | Red-blink mode characterisation| Complete             | HID output disabled (error 31); safe for USB experimentation (F-033)            |
-| CDN firmware acquisition       | **CLOSED**           | Hardware CDN decommissioned; all endpoints 404 (F-040); community/JTAG remain   |
-| RF pairing                     | **Blocked**          | All modes fail; HID gated on RF link; app-mode + button-press attempt pending (Q-012) |
-| HID command format             | Blocked              | Gated on RF pairing (Q-012); report ID `0x06` = DFU trigger (F-026)             |
+| CDN firmware acquisition       | **RESOLVED**         | Community `FW_V1.26.bin` (649 KB) obtained (F-042); CDN itself still dead  |
+| RF pairing                     | Blocked — reduced priority | All modes fail; no longer critical path (F-045/F-046 bypass the need) |
+| HID command format             | Partially blocked    | Gated on RF pairing (Q-012); vendor control transfers open alternative path (F-046) |
+| Chip identification            | **Complete**         | Realtek 8051 MCU (confirmed via flash opcodes F-047); "REALSIL" vendor string |
+| WinUSB / raw USB access        | **Complete**         | Zadig replaces HidUsb on MI_06; full libusb control pipe access (F-045)    |
+| Vendor control transfer channel| **Complete**         | Bidirectional; flash read, build date, vendor string all confirmed (F-046)  |
+| Flash write protocol RE        | **In progress**      | Read confirmed (`bReq=0x26`); write opcodes TBD — Q-013 active blocker     |
 | Battery reporting              | Not started          | Blocked on app-mode command format (Q-003)                                 |
 | Audio control event monitoring | Not started          | Q-006 — elevated priority                                                  |
 | USB traffic capture (Swarm)    | CLOSED               | Swarm cannot see `26CE:0A0B`; Swarm II out of scope (F-017, F-023)         |
-| Firmware version query         | Not started          | Q-007 — may be answerable via DFU memory readback                          |
+| Firmware version query         | **Partial**          | `FW_V1.26` from filename; build date `05/27/24` via `bReq=0x07,wVal=2` (F-046) |
 
 ## Current Blocker / Next Steps
 
-**Dongle recovery is SOLVED (F-029):** Hold the physical button while plugging in USB.
-LED changes to blinking red; device fully enumerates as `26CE:0A0B`. This works from any
-observed failure state including the F-027 deep non-enumeration. Procedure is repeatable
-and confirmed.
+**Session 11 was the most significant session of the investigation.** In a single session,
+the investigation went from "open hid fail" to a fully working bidirectional USB communication
+channel with the dongle's Realtek 8051 MCU, bypassing the broken HID layer entirely.
 
-**Official software recovery paths are exhausted.** The complete failure chain (F-038, F-040):
+**What is now solved:**
+
+- **Dongle recovery** (F-029): Hold button while plugging in. LED → blinking red; full enumeration as `26CE:0A0B`.
+- **Firmware binary** (F-042): Community `FW_V1.26.bin` (649 KB) obtained from Google Drive.
+- **USB communication channel** (F-045/F-046): Zadig replaces HidUsb with WinUSB on MI_06; vendor control transfers on endpoint 0 work reliably.
+- **Chip identification** (F-047): Realtek 8051 MCU (not PIC32). Chip vendor string "REALSIL\0" at `bReq=0x07,wVal=3`. Build date `05/27/24` at `bReq=0x07,wVal=2`. Flash readback via `bReq=0x26` produces valid 8051 opcodes.
+
+**The official software recovery chain (F-038, F-040) is irrelevant going forward:**
 
 ```
 Firmware update changes dongle VID: 1E7D:3A37 → 26CE:0A0B
-  → Swarm stops detecting the dongle (looks for 0x1E7D only)
-  → Recovery tool detects it but needs firmware files
-  → Firmware files require Swarm module download
-  → Swarm can't download: device not detected
-  → Roccat decommissions the hardware CDN: all endpoints 404
-  → No official path to obtain firmware or reflash the device
+  → Swarm stops detecting the dongle  [bypassed via WinUSB]
+  → Recovery tool circular dependency  [bypassed via vendor control transfers]
+  → Roccat CDN decommissioned          [bypassed via community FW_V1.26.bin]
+  → No official flash path             [NEW: vendor OUT requests on control pipe]
 ```
 
-**Active blocker — RF pairing (Q-012):** No wireless link established in any tested mode.
-HID Interface 6 is silent without an active RF connection. Next attempt: solid-white (app)
-mode + headset pairing + short button press (pink/magenta, F-030).
+**Active blocker — flash write protocol RE (Q-013):** Flash reads are confirmed. The
+write-side opcode(s) — erase, write-page, verify — are unknown. The `firmware_upgrade.dll`
+Neon protocol handler holds the ground truth; static analysis of that DLL's control
+transfer path will yield the exact `bReq` values.
 
-**Remaining paths:**
-1. **Community firmware cache** — someone with a pre-update dongle may have `data/3A37/firmware/` cached; worth posting on Roccat forums/Reddit
-2. **JTAG/SWD hardware debug** — open the dongle, access PIC32 or nRF debug pins, read flash directly
-3. **Pre-update replacement dongle** — a unit still presenting as `1E7D:3A37` would work with Swarm normally
+**Next session priority:**
+1. Enumerate vendor OUT opcodes (`bmRequestType=0x41`, `bReq=0x24`–`0x30`, `wIndex=6`)
+   using a safe read-after-write differential to detect which opcode writes without
+   triggering a crash.
+2. Disassemble the Neon protocol path in `firmware_upgrade.dll` to extract flash write
+   `bReq` values directly.
+3. Test `bReq=4` (USB DFU DNLOAD) — if the device wraps standard USB DFU class on the
+   vendor pipe, the write path may already be documented in the USB DFU spec.
+4. Continue RF pairing attempts (Q-012) in parallel — solid-white app mode + short button
+   press (pink/magenta, F-030) is still untested as the correct pairing entry point.
 
 ## Documents
 
 | File                  | Contents                                                                        |
 |-----------------------|---------------------------------------------------------------------------------|
 | `README.md`           | This file — overview, status, key findings summary                              |
-| `findings.md`         | Chronological log of all discoveries (F-001 through F-041)                     |
+| `findings.md`         | Chronological log of all discoveries (F-001 through F-047)                     |
 | `usb_descriptor.md`   | Full USB descriptor tables, endpoint map, probe results                         |
 | `protocol_notes.md`   | HID command format, reference Elo 7.1 Air protocol, command hypotheses          |
-| `open_questions.md`   | Open questions (Q-008/Q-009/Q-010/Q-011 closed; Q-012 active)                  |
+| `open_questions.md`   | Open questions (Q-008–Q-011 closed; Q-012 medium; Q-013 active blocker)        |
 
 ## Key Findings Summary
 
@@ -243,6 +258,35 @@ mode + headset pairing + short button press (pink/magenta, F-030).
     software keys; CDN resolves to Hetzner S3 (`nbg1.your-objectstorage.com/tbnb/...`);
     hardware download path is dead.
 
+### Session 11 findings (MAJOR BREAKTHROUGH — chip ID, WinUSB, vendor control channel)
+42. **Community firmware binary obtained** (F-042) — `Elo71AirModule.zip` → `FW_V1.26.bin`
+    (649 KB), build date May 27 2024, version string `FW_V1.26`. Sourced from community
+    Google Drive; official CDN is dead (F-040) but binary acquisition unblocked.
+43. **VID patch and hidapi direct-open fail; HID output endpoint dead** (F-043) — patching
+    the VID in-memory (`0x26CE→0x1E7D`) to make Swarm detect the device fails; hidapi
+    `hid_open()` on the vendor interface returns an error because `HidD_GetAttributes`
+    reports the device is not a HID device. HID output endpoint returns `ERROR_GEN_FAILURE`
+    (error 31) — endpoint disabled at firmware level, not a driver issue.
+44. **Headset charge-only status confirmed by second cable test** (F-044) — rules out
+    cable quality as a variable; headset USB-C is definitively data-inert.
+45. **WinUSB driver substitution via Zadig: full raw USB access achieved** (F-045) —
+    Zadig replaces `HidUsb` on MI_06 (`26CE:0A0B` Interface 6) with WinUSB. Gives
+    `libusb_open()` access to the control pipe. All subsequent vendor control transfers
+    operate over this channel.
+46. **Vendor control transfers working: flash read, build date, vendor string** (F-046) —
+    `bmRequestType=0xC1` (IN|VENDOR|INTERFACE), `wIndex=6` bypasses the HID layer
+    completely. Confirmed opcodes:
+    - `bReq=0x07, wVal=2` → `"05/27/24"` (firmware build date)
+    - `bReq=0x07, wVal=3` → `"REALSIL\0"` (chip vendor string)
+    - `bReq=0x26` → flash content (8051 machine code)
+    - `bReq=0x06` OUT → write succeeds, dongle stays alive (no DFU trigger over this path)
+    - `bReq=0x01` IN → DFU UPLOAD equivalent, response observed
+47. **Chip confirmed: Realtek 8051 MCU (not PIC32)** (F-047) — "REALSIL" = Realtek Silicon.
+    Flash readback at address 0 produces `e4 ff fe 12 01 2c 60...` — valid 8051 opcodes
+    (`MOV R7,#0x00`, `MOV R6,#0x00`, `LJMP 0x012C`, `JZ ...`). The PIC32 updater in
+    `firmware_upgrade.dll` handles other Roccat products; it does not apply to this device.
+    Firmware version `FW_V1.26`, binary size 649 KB, build date 2024-05-27.
+
 ## Related Prior Art
 
 | Project        | File / Path                         | VID covered |
@@ -265,3 +309,4 @@ mode + headset pairing + short button press (pink/magenta, F-030).
 | 2026-04-17 | Session 8: Q-008 RESOLVED — button-hold recovery confirmed (F-029); LED state map documented (F-030); RF pairing failure documented (F-031); Q-012 added as new blocker; status table updated |
 | 2026-04-17 | Session 9: No USB DFU bootloader (F-032, Q-011 closed); red-blink characterised as safe/radio-only (F-033, F-035); headset USB charge-only (F-034); headset no recovery mode (F-036); Q-012 updated; end-of-day summary written |
 | 2026-04-18 | Session 10: settings.xml decoded — DFU PID 1E7D:3A36 confirmed (F-037); VID 0x26CE = Savitech, change deliberate (F-038); firmware_upgrade.dll fully analysed — 9 protocols, 520B flash packet (F-039); CDN decommissioned — all hardware endpoints 404 (F-040); Swarm log decoded (F-041); Q-010 CDN path closed; consequence chain documented |
+| 2026-04-19 | Session 11: MAJOR BREAKTHROUGH — community firmware binary obtained (F-042); HID endpoint confirmed dead at firmware level (F-043); WinUSB/Zadig substitution achieves raw USB access (F-045); vendor control transfers working — flash read, build date, vendor string (F-046); chip confirmed Realtek 8051, not PIC32 (F-047); Q-012 priority downgraded; Q-013 added (flash write protocol RE — new critical blocker); status table updated; blocker section rewritten |

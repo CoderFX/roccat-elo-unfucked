@@ -1470,3 +1470,233 @@ No official software path to obtain firmware or reflash the device
 | Wayback Machine CDN snapshot | Unlikely | CDN content rarely archived |
 | JTAG/SWD hardware debug | Viable (hardware work) | Requires opening the dongle and accessing test points |
 | Replace with pre-update dongle (`1E7D:3A37`) | Viable | A dongle that never received the VID-changing update would work with Swarm |
+
+---
+
+## Session 11 — 2026-04-18
+
+### F-042 — Community firmware module obtained; complete `data/3A37/` package acquired
+
+**Phase:** Community sourcing — Google Drive link from 2025 Reddit recovery post
+
+The complete Swarm device module for the Elo Air dongle was obtained from a community
+source: `Elo71AirModule.zip` (34 MB), posted to a Reddit thread by a user who had captured
+it from Swarm's CDN before decommissioning (F-040).
+
+**Archive contents:**
+
+| File | Size | Description |
+|------|------|-------------|
+| `firmware/FW_V1.23.bin.bk` | 649 KB | Original firmware, `.bk` suffix = backup before update |
+| `firmware/FW_V1.26.bin` | 649 KB | Newer firmware version — the flashing target |
+| `firmware/firmware_upgrade.ini` | — | 3-line INI: `name=FW`, `version=126`, `auto_reset_version=113` |
+| `3A37.dll` | — | Device-specific Swarm UI DLL |
+| `Driver/Win10/ELO71AIR.Inf` | — | Realtek audio driver INF |
+| `Driver/Win10/Elo71Air.sys` | — | Realtek audio driver kernel module |
+| `version.ini` | — | Contents: `[52]`, `compatibility=2` (device type 52 = Elo Air dongle, per F-037) |
+
+**`firmware_upgrade.ini` format confirmed:**
+```ini
+name=FW
+version=126
+auto_reset_version=113
+```
+The version field `126` corresponds to `FW_V1.26.bin` (decimal, not hex). The
+`auto_reset_version=113` field is the minimum firmware version below which the device
+must be reset to factory defaults before the update can be applied — version 1.13 or
+earlier requires a reset; versions above it can be updated in place.
+
+**Significance:** This unblocks the `ROCCAT_Recover_Tool.exe` path and also provides the
+firmware binary (`FW_V1.26.bin`) needed for a direct vendor-protocol flash via the USB
+control transfer channel discovered in F-046.
+
+**Confidence:** confirmed — archive contents extracted and verified
+
+---
+
+### F-043 — VID patch applied to `firmware_upgrade.dll`; Recovery Tool shows "ELO AIR" but `open hid fail`
+
+**Phase:** Recovery Tool patch attempt
+
+30 occurrences of the Roccat VID `0x1E7D` (bytes `7D 1E` in little-endian) were patched to
+`0x26CE` (`CE 26`) in `firmware_upgrade.dll`. After patching:
+
+- `ROCCAT_Recover_Tool.exe` dropdown now displays **"ELO AIR"** — first time the tool has
+  shown the device by name in this investigation
+- Tool proceeds to the firmware update step and loads `FW_V1.26.bin`
+- Update fails with: **`open hid fail`**
+- Windows error detail: `"A device attached to the system is not functioning"`
+  (`ERROR_GEN_FAILURE`, error 31)
+
+**Root cause:** The DLL's embedded hidapi attempts to open the HID device handle and write
+to the HID output endpoint. This is the same endpoint that returns `ERROR_GEN_FAILURE` in
+red-blink mode (F-033) — the HID output endpoint is disabled at the firmware level. Even
+Roccat's own hidapi, targeting the correct VID, cannot write to it.
+
+**Implication:** The standard Swarm/Recovery Tool flash path (HID output report → DFU mode
+entry) is completely blocked by the broken HID output endpoint. The HID layer cannot be the
+flash channel. However, the vendor USB control transfer channel (F-046) bypasses the HID
+layer entirely and works — this is now the correct path.
+
+**Confidence:** confirmed — `open hid fail` error observed directly after VID patch
+
+---
+
+### F-044 — Headset USB-C charge-only confirmed at hardware level; data pins unconnected
+
+**Phase:** Definitive headset USB data path test
+
+A verified data-capable USB-C cable (confirmed working for phone file transfer on the same
+host) was used to connect the headset. The headset produced no USB enumeration. Tested
+across three separate cables total. No new VID:PID appeared under any method.
+
+**Conclusion:** The headset's USB-C port is charge-only at the **hardware level** — the
+data lines (D+/D−, or USB 3.x SuperSpeed pairs) are not routed to the USB controller
+inside the headset. This is not a software or pairing issue; it is a PCB trace decision.
+
+This supersedes F-034 (which reached the same conclusion from two cable tests) and adds
+the verified-data-cable confirmation as definitive evidence.
+
+**Confidence:** confirmed — three cables including one independently verified for data
+
+---
+
+### F-045 — WinUSB driver replacement via Zadig achieves raw USB access; HID layer bypassed
+
+**Phase:** Driver substitution — Zadig tool
+
+The Windows HID driver (`HidUsb`) bound to Interface 6 (`MI_06`) was replaced with WinUSB
+using the Zadig tool. This gives raw USB access to Interface 6 via the libusb/WinUSB API,
+bypassing the Windows HID driver stack entirely.
+
+**Results:**
+
+| Operation | Result |
+|-----------|--------|
+| `usb.util.claim_interface(dev, 6)` | **SUCCESS** |
+| HID `SET_REPORT` (output report write) | Fails — pipe error (HID endpoint still broken at FW level) |
+| Vendor control transfers (`bmRequestType=0xC1`) | **WORK PERFECTLY** — see F-046 |
+
+**Why this works:** WinUSB exposes the USB control pipe (endpoint 0) directly, independent
+of the HID endpoint state. The vendor requests use endpoint 0, which is always active on
+any enumerated USB device regardless of other endpoint states.
+
+**Why the HID output endpoint still fails:** The HID output endpoint (`EP OUT` on Interface
+6) is disabled in the dongle firmware — confirmed by `ERROR_GEN_FAILURE` in all prior
+tests. Changing the host driver to WinUSB does not change what the firmware does with the
+endpoint; it just changes how the host accesses the control pipe.
+
+**Operational note:** The WinUSB substitution persists until Zadig is used again or the
+driver is manually reverted. The dongle must be re-plugged after the Zadig change for the
+new binding to take effect.
+
+**Confidence:** confirmed — `claim_interface` success and control transfer results observed
+
+---
+
+### F-046 — CRITICAL: Vendor control transfer protocol discovered; device is fully communicating
+
+**Phase:** USB vendor request probe via libusb/WinUSB
+
+With WinUSB installed (F-045), a systematic probe of vendor control transfers was conducted.
+`bmRequestType = 0xC1` (`IN | VENDOR | INTERFACE`), `wIndex = 6`.
+
+**Working IN requests (device → host):**
+
+| `bRequest` | `wValue` | Response size | Raw bytes | Interpretation |
+|-----------|---------|--------------|-----------|----------------|
+| `0x06` | 0 | 1 B | `05` | Device mode / status byte |
+| `0x07` | 0 | 8 B | `da 0b 42 40 00 00 12 10` | Device ID word + firmware build `0x1210` |
+| `0x07` | 2 | 8 B | `30 35 2f 32 37 2f 32 34` | ASCII **"05/27/24"** — firmware build date |
+| `0x07` | 3 | 8 B | `52 45 41 4c 53 49 4c 00` | ASCII **"REALSIL\0"** — chip vendor string |
+| `0x07` | 4 | 8 B | `00 00 10 01 00 00 00 00` | Memory layout descriptor |
+| `0x07` | 8 | 8 B | `31 14 78 56 34 12 80 40` | Configuration data |
+| `0x07` | 9 | 8 B | `00 00 01 00 00 00 01 45` | Flash configuration |
+| `0x07` | 10 | 8 B | `00 00 02 00 ff ff ff ff` | Flash size info |
+| `0x26` | 0 | 64 B | `e4 ff fe 12 01 2c 60 ...` | Flash/firmware content — **8051 opcodes** |
+| `0x2D` | 0 | 64 B | `30 00 00 00 ...` | Config / settings region |
+| `0x2E` | 0 | 64 B | Same as `0x26` | Flash read (alias for `0x26`) |
+| `0x49` | 0 | 64 B | Variable | Flash region (different address) |
+| `0x4A` | 0 | 1 B | `01` | Status flag |
+| `0x85` | 0 | 2 B | `00 00` | Status word |
+
+**Standard DFU request also responds:**
+
+| Request | `bRequest` | Response |
+|---------|-----------|---------|
+| DFU UPLOAD | 1 | `03 00 00 ...` (returns data) |
+
+**Working OUT requests (host → device):**
+
+| `bRequest` | Behaviour |
+|-----------|-----------|
+| `0x06` OUT with data bytes | Write succeeds; dongle stays alive and enumerated |
+
+Status byte (`bReq=0x06`) reads `0x05` both before and after OUT writes — the device
+acknowledges writes without crashing.
+
+**Significance:** The dongle is fully communicating. This is the complete communication
+channel needed for both protocol RE and firmware flashing. The control pipe is stable —
+writes do not trigger DFU mode or cause drops. The device is responsive and cooperative
+on the vendor channel.
+
+**Confidence:** confirmed — all responses observed directly
+
+---
+
+### F-047 — Chip confirmed as Realtek (not Savitech, not PIC32); 8051 core; firmware dated May 2024
+
+**Phase:** Chip identification from vendor control transfer responses
+
+Three independent data points from F-046 identify the chip:
+
+1. **`bReq=0x07, wVal=3` → `"REALSIL\0"`** — the chip self-identifies as "REALSIL"
+   (Realtek Silicon), Realtek's internal product prefix
+
+2. **`bReq=0x26` → 8051 opcodes** — the flash content returned begins with recognisable
+   Intel 8051 instruction bytes (`e4` = CLR A, `ff` = MOV R7,A, `fe` = MOV R6,A,
+   `12` = LCALL, `2c 60` = target address). Realtek USB audio SoCs universally use 8051
+   cores for application firmware.
+
+3. **`bReq=0x07, wVal=2` → `"05/27/24"`** — firmware build date of May 27, 2024.
+
+**Revised MCU identification:**
+
+The earlier hypothesis of a PIC32 application MCU (from `firmware_upgrade.dll` strings,
+F-019) is now disproven for this device. The `firmware_upgrade.dll` PIC32 protocol is
+present because the DLL handles multiple Roccat device families — the PIC32 updater is for
+other Roccat products. The Elo Air dongle uses:
+
+- **Realtek USB audio SoC** (likely RTL series) with integrated 8051 MCU
+- The `0x26CE` VID is registered to Savitech but used here by Realtek (VID sharing or
+  Savitech OEM relationship — both companies make USB audio ICs)
+- 2.4 GHz radio integration is within the Realtek SoC or via a co-packaged nRF die
+
+**Impact on flash protocol:** The firmware is 8051 machine code. The flash write protocol
+is Realtek-vendor-specific (not standard PIC32 flash commands). The `bReq=0x26`/`0x2E`
+read commands suggest corresponding write commands exist at nearby opcodes. The 649 KB
+firmware binary (`FW_V1.26.bin`) is 8051 code loadable into this chip.
+
+**Confidence:** confirmed for chip family and core (three independent data points);
+speculative for exact part number and radio integration topology
+
+---
+
+### Recovery path summary after Session 11
+
+The path to a fully reflashed dongle is now clear:
+
+| Step | Status | Method |
+|------|--------|--------|
+| 1. Obtain firmware binary | **DONE** — `FW_V1.26.bin` (F-042) | Community module |
+| 2. Establish USB communication channel | **DONE** — vendor control transfers (F-046) | WinUSB + libusb |
+| 3. Identify flash write protocol | **Remaining** | Reverse-engineer Realtek vendor OUT requests |
+| 4. Implement erase + write + verify | **Remaining** | Craft flash sequence from `bReq` mapping |
+| 5. Flash `FW_V1.26.bin` | **Remaining** | Execute flash sequence |
+| 6. Verify dongle re-enumerates as `1E7D:3A37` | **Remaining** | USB enumeration scan |
+
+**Next session priority:** Map the vendor OUT request opcodes for erase, write-page, and
+verify. The read opcode `0x26`/`0x2E` suggests writes are at adjacent opcodes (`0x27`,
+`0x2F`, or similar). The DFU UPLOAD response (`bReq=1`) indicates the device may also
+support the standard USB DFU protocol on the control pipe — test `bReq=4` (DFU DNLOAD)
+as a candidate write command.

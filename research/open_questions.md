@@ -259,15 +259,20 @@ Swarm acting as the bridge.
 
 ## Q-012 — Why is RF pairing failing, and how do we establish a headset connection?
 
-**Status:** open
-**Priority:** HIGH — primary blocker for app-mode HID RE; all command probing is gated on this
-**Related findings:** F-016, F-020, F-029, F-030, F-031, F-033, F-034, F-036
+**Status:** open — reduced priority; vendor control transfer channel established (F-045/F-046)
+**Priority:** MEDIUM — no longer the primary blocker; flash write protocol RE (Q-013) is now the critical path
+**Related findings:** F-016, F-020, F-029, F-030, F-031, F-033, F-034, F-036, F-045, F-046, F-047
 
-**Detail:** The headset and dongle will not pair in any tested configuration. F-031
-documents blinking-red mode + headset pairing mode with zero result. F-033 confirms that
-red-blink mode intentionally disables the HID output endpoint — it is a wireless-only
-recovery state, not a normal operating mode. The HID vendor interface (Interface 6) produces
-no traffic without an established RF link across all observed dongle states.
+**Update (Session 11 — 2026-04-19):** The WinUSB breakthrough (F-045) and working vendor
+control transfer channel (F-046) have fundamentally changed the investigation's dependency
+on RF pairing. The host can now communicate bidirectionally with the dongle's Realtek 8051
+MCU without a wireless link. Flash content is readable via `bReq=0x26` (confirmed producing
+8051 opcodes, F-047). RF pairing is still desirable for HID command format RE (Q-003) and
+operational protocol documentation, but it is no longer the gate for firmware analysis.
+
+**Remaining detail:** The headset and dongle will not pair in any tested configuration.
+F-033 confirms red-blink mode intentionally disables the HID output endpoint. HID Interface 6
+is silent without an established RF link.
 
 Additional constraints confirmed in Session 9:
 - Headset USB-C is charge-only — no data path, no headset-side firmware update possible
@@ -305,9 +310,69 @@ Additional constraints confirmed in Session 9:
 3. **Research factory re-pair procedure:** Search for Roccat Elo Air pairing reset — some
    devices support holding headset power button for 10+ seconds to clear bond and
    re-advertise to any dongle.
-4. **Firmware reflash (Q-010):** If the radio stack is broken, reflashing working firmware
-   via `ROCCAT_Recover_Tool.exe` (once the firmware binary is obtained) is the last
-   software-layer option before JTAG.
+4. **Firmware reflash:** With the vendor write protocol mapped (Q-013), reflashing the
+   dongle RF stack directly via the USB control pipe is now a viable path — no longer
+   dependent on Swarm or CDN.
+
+---
+
+---
+
+## Q-013 — What are the vendor OUT request opcodes for flash erase, write-page, and verify?
+
+**Status:** open
+**Priority:** CRITICAL — primary blocker for firmware reflash and HID protocol RE
+**Related findings:** F-039, F-045, F-046, F-047
+
+**Detail:** The vendor control transfer channel is fully established (F-046). Flash read
+is confirmed working via `bReq=0x26` (and likely `0x2E`). The readback produces valid 8051
+opcodes (F-047). What remains unknown is the write side of the flash protocol: which
+`bReq` values trigger flash erase, write-page, and verify operations on the Realtek 8051.
+
+**Known read opcodes (confirmed):**
+
+| bReq  | Direction | Purpose                                  | Confidence    |
+|-------|-----------|------------------------------------------|---------------|
+| `0x07`| IN        | Descriptor string query (wVal=2→date, wVal=3→"REALSIL\0") | confirmed |
+| `0x26`| IN        | Flash content readback — produces 8051 opcodes | confirmed |
+| `0x2E`| IN        | Likely flash read (adjacent to `0x26`)   | likely        |
+| `0x01`| IN        | DFU UPLOAD equivalent — response observed| likely        |
+
+**Write opcode candidates:**
+
+1. **Adjacent opcodes (`0x27`, `0x2F`, `0x28`):** Realtek typically pairs read/write at
+   adjacent opcode numbers. `0x27` (next after `0x26`) and `0x2F` (next after `0x2E`) are
+   the highest-priority candidates for write-page.
+2. **USB DFU DNLOAD (`bReq=4`):** Standard USB DFU uses request 4 (DNLOAD) for write and
+   request 1 (UPLOAD) for read. If the vendor layer wraps the standard DFU protocol on the
+   control pipe, `bReq=4` with `bmRequestType=0x41` (OUT|VENDOR|INTERFACE) may be the
+   write trigger.
+3. **Erase opcode:** Flash block erase is typically a separate command. Candidates:
+   `0x24`, `0x28`, or a wValue-parameterized variant of the read opcode.
+
+**flash packet format (from F-039, `firmware_upgrade.dll`):**
+```
+520 bytes total:
+  Bytes 0–7:   Header (address, length, sequence, flags — exact layout TBD)
+  Bytes 8–519: 512-byte data payload
+CRC-16 CCITT poly 0x1021 (standard) and 0x8408 (reflected) both present in DLL
+```
+
+**How to resolve:**
+
+1. **Enumerate vendor OUT requests systematically:** Send `bmRequestType=0x41` (OUT|VENDOR|
+   INTERFACE), `wIndex=6`, `bReq` = `0x24`–`0x30` with a 520-byte zero-filled buffer.
+   Observe whether dongle stays alive (safe opcode), produces an IN response, or drops (active write triggered). Start with power-of-two padding to avoid accidental flash corruption.
+2. **Differential flash reads:** After each candidate OUT request, immediately read back
+   flash via `bReq=0x26` at the same address. Any change in returned bytes confirms a
+   write opcode.
+3. **Static analysis of `firmware_upgrade.dll`:** The `Neon` protocol handler (report ID
+   `0x06`/`0x07` path) and the PIC32 handler both use the 520-byte packet format. Disassemble
+   the DLL's flash write path to extract the exact `bReq` values it sends. This is the
+   ground truth — the DLL was writing to this hardware successfully before the CDN closed.
+4. **Test `bReq=4` (USB DFU DNLOAD):** If the device responds to `bReq=1` as UPLOAD, it
+   may implement the full USB DFU class on the vendor control pipe. Standard DFU DNLOAD is
+   `bReq=4`, `bmRequestType=0x21` (OUT|CLASS|INTERFACE).
 
 ---
 
@@ -319,7 +384,7 @@ Additional constraints confirmed in Session 9:
 | Q-005 | What do `0xA0`–`0xAA` opcodes on `26CE:01A2` control?   | 2026-04-17 (OOS)| F-010   |
 | Q-008 | Is the dongle permanently damaged / how to recover?      | 2026-04-17      | F-029   |
 | Q-009 | Swarm USB traffic capture — viable approach?             | 2026-04-17 (CLOSED) | F-017 |
-| Q-010 | Obtain Elo firmware binary via CDN                       | 2026-04-18 (CLOSED — CDN dead) | F-040 |
+| Q-010 | Obtain Elo firmware binary via CDN                       | 2026-04-18 (CDN dead); F-042 community binary obtained | F-040, F-042 |
 | Q-011 | Identify bootloader-mode VID:PID / enumerate DFU device  | 2026-04-17 (CLOSED) | F-032 |
 
 ---
@@ -339,3 +404,4 @@ Additional constraints confirmed in Session 9:
 | 2026-04-17 | Session 8: Q-008 RESOLVED — button-hold recovery confirmed (F-029); Q-012 added (RF pairing failure, new blocker for HID RE) |
 | 2026-04-17 | Session 9: Q-011 CLOSED — no USB bootloader exists; DFU is radio-based (F-032); Q-012 updated with F-033/F-034/F-036 constraints; resolution steps revised |
 | 2026-04-18 | Session 10: Q-010 official CDN path CLOSED — hardware download endpoint 404 (F-040); DFU PID 0x3A36 confirmed from settings.xml (F-037); community/JTAG paths remain open |
+| 2026-04-19 | Session 11: MAJOR BREAKTHROUGH — Q-012 priority downgraded; vendor control transfer channel established (F-045/F-046) means investigation is no longer gated on RF pairing; Q-013 added (flash write protocol RE — new critical blocker); Q-010 resolved table note updated — community firmware obtained (F-042); chip confirmed Realtek 8051, not PIC32 (F-047) |
