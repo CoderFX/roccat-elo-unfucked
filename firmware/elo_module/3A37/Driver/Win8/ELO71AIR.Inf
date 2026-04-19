@@ -1,0 +1,418 @@
+;
+;Turtle Beach ELO 7.1 AIR Driver
+;
+
+[Version]
+signature="$WINDOWS NT$"
+Class=Media
+ClassGUID={4d36e96c-e325-11ce-bfc1-08002be10318}
+Provider=%CMEDIA%
+Catalogfile=ELO71AIR.cat
+DriverVer=08/17/2020,8.0.01.03
+
+[SourceDisksNames]
+1000=%cdname%,,,
+
+[SourceDisksFiles.x86]
+ELO71AIR.sys=1000,\x86
+CMEFFECTAPO_ELO71AIR.dll=1000,\x86
+CMCPLEXT_ELO71AIR.dll=1000,\x86
+
+[SourceDisksFiles.amd64]
+ELO71AIR.sys=1000,\x64
+CMEFFECTAPO_ELO71AIR.dll=1000,\x64
+CMCPLEXT_ELO71AIR.dll=1000,\x64
+
+[SignatureAttributes]
+ELO71AIR.sys=SignatureAttributes.DRM
+CMEFFECTAPO_ELO71AIR.dll=SignatureAttributes.PETrust
+CMCPLEXT_ELO71AIR.dll=SignatureAttributes.PETrust
+
+[SignatureAttributes.DRM]
+DRMLevel=1300
+
+[SignatureAttributes.PETrust]
+PETrust=true
+
+[DestinationDirs]
+DefaultDestDir=12
+ELO71AIR.CopyFiles=12
+CMEFFECTAPO_ELO71AIR.CopyFiles=11
+
+[Manufacturer]
+%ManufacturerString%=ManufacturerID,NTamd64
+
+[ManufacturerID]
+%ELO71AIR.DeviceDesc%=ELO71AIR,USB\VID_1E7D&PID_3A37&MI_01
+
+[ManufacturerID.NTamd64]
+%ELO71AIR.DeviceDesc%=ELO71AIR,USB\VID_1E7D&PID_3A37&MI_01
+
+;---------------------------------------------------------------
+;                x 86  D D I n s t a l l
+;---------------------------------------------------------------
+
+[ELO71AIR]
+Include=ks.inf, wdmaudio.inf
+Needs=KS.Registration, WDMAUDIO.Registration,mssysfx.CopyFilesAndRegister
+DelReg=ELO71AIR.DelReg
+AddReg=ELO71AIR.AddReg, ELO71AIR_NAMES.AddReg, SfxFx.AddReg
+AddProperty=ELO71AIRBranding.AddProperty
+CopyFiles=ELO71AIR.CopyFiles, CMEFFECTAPO_ELO71AIR.CopyFiles
+
+;---------------------------------------------------------------
+;                x 64  D D I n s t a l l
+;---------------------------------------------------------------
+
+[ELO71AIR.NTamd64]
+Include=ks.inf, wdmaudio.inf
+Needs=KS.Registration, WDMAUDIO.Registration,mssysfx.CopyFilesAndRegister
+DelReg=ELO71AIR.DelReg
+AddReg=ELO71AIR.AddReg, ELO71AIR_NAMES.AddReg, SfxFx.AddReg
+AddProperty=ELO71AIRBranding.AddProperty
+CopyFiles=ELO71AIR.CopyFiles, CMEFFECTAPO_ELO71AIR.CopyFiles
+
+[ELO71AIRBranding.AddProperty]
+DeviceVendorWebSite,,,,"https://www.turtlebeach.com/pages/elite-atlas-aero-headset" ; Place your URL here
+
+;---------------------------------------------------------------
+;                I n t e r f a c e s
+;---------------------------------------------------------------
+
+[ELO71AIR.Interfaces]
+AddInterface=%KSCATEGORY_AUDIO%,%KSNAME_SPEAKER.WAVE%,Audio.I.SPEAKER.WAVE
+AddInterface=%KSCATEGORY_RENDER%,%KSNAME_SPEAKER.WAVE%,Audio.I.SPEAKER.WAVE
+
+AddInterface=%KSCATEGORY_AUDIO%,%KSNAME_SPDIFOUT.WAVE%,Audio.I.SPDIFOUT.WAVE
+AddInterface=%KSCATEGORY_RENDER%,%KSNAME_SPDIFOUT.WAVE%,Audio.I.SPDIFOUT.WAVE
+
+AddInterface=%KSCATEGORY_AUDIO%,%KSNAME_HPOUT.WAVE%,Audio.I.HPOUT.WAVE
+AddInterface=%KSCATEGORY_RENDER%,%KSNAME_HPOUT.WAVE%,Audio.I.HPOUT.WAVE
+
+AddInterface=%KSCATEGORY_AUDIO%,%KSNAME_RECIN.WAVE%,Audio.I.RECIN.WAVE
+AddInterface=%KSCATEGORY_CAPTURE%,%KSNAME_RECIN.WAVE%,Audio.I.RECIN.WAVE
+
+AddInterface=%KSCATEGORY_AUDIO%,%KSNAME_MICIN.WAVE%,Audio.I.MICIN.WAVE
+AddInterface=%KSCATEGORY_CAPTURE%,%KSNAME_MICIN.WAVE%,Audio.I.MICIN.WAVE
+
+AddInterface=%KSCATEGORY_AUDIO%,%KSNAME_LINEIN.WAVE%,Audio.I.LINEIN.WAVE
+AddInterface=%KSCATEGORY_CAPTURE%,%KSNAME_LINEIN.WAVE%,Audio.I.LINEIN.WAVE
+
+AddInterface=%KSCATEGORY_AUDIO%,%KSNAME_SPDIFIN.WAVE%,Audio.I.SPDIFIN.WAVE
+AddInterface=%KSCATEGORY_CAPTURE%,%KSNAME_SPDIFIN.WAVE%,Audio.I.SPDIFIN.WAVE
+
+AddInterface=%KSCATEGORY_AUDIO%,%KSNAME_GLOBAL.TOPO%,Audio.I.GLOBAL.TOPO
+AddInterface=%KSCATEGORY_TOPOLOGY%,%KSNAME_GLOBAL.TOPO%,Audio.I.GLOBAL.TOPO
+
+[ELO71AIR.NTamd64.Interfaces]
+AddInterface=%KSCATEGORY_AUDIO%,%KSNAME_SPEAKER.WAVE%,Audio.I.SPEAKER.WAVE
+AddInterface=%KSCATEGORY_RENDER%,%KSNAME_SPEAKER.WAVE%,Audio.I.SPEAKER.WAVE
+
+AddInterface=%KSCATEGORY_AUDIO%,%KSNAME_SPDIFOUT.WAVE%,Audio.I.SPDIFOUT.WAVE
+AddInterface=%KSCATEGORY_RENDER%,%KSNAME_SPDIFOUT.WAVE%,Audio.I.SPDIFOUT.WAVE
+
+AddInterface=%KSCATEGORY_AUDIO%,%KSNAME_HPOUT.WAVE%,Audio.I.HPOUT.WAVE
+AddInterface=%KSCATEGORY_RENDER%,%KSNAME_HPOUT.WAVE%,Audio.I.HPOUT.WAVE
+
+AddInterface=%KSCATEGORY_AUDIO%,%KSNAME_RECIN.WAVE%,Audio.I.RECIN.WAVE
+AddInterface=%KSCATEGORY_CAPTURE%,%KSNAME_RECIN.WAVE%,Audio.I.RECIN.WAVE
+
+AddInterface=%KSCATEGORY_AUDIO%,%KSNAME_MICIN.WAVE%,Audio.I.MICIN.WAVE
+AddInterface=%KSCATEGORY_CAPTURE%,%KSNAME_MICIN.WAVE%,Audio.I.MICIN.WAVE
+
+AddInterface=%KSCATEGORY_AUDIO%,%KSNAME_LINEIN.WAVE%,Audio.I.LINEIN.WAVE
+AddInterface=%KSCATEGORY_CAPTURE%,%KSNAME_LINEIN.WAVE%,Audio.I.LINEIN.WAVE
+
+AddInterface=%KSCATEGORY_AUDIO%,%KSNAME_SPDIFIN.WAVE%,Audio.I.SPDIFIN.WAVE
+AddInterface=%KSCATEGORY_CAPTURE%,%KSNAME_SPDIFIN.WAVE%,Audio.I.SPDIFIN.WAVE
+
+AddInterface=%KSCATEGORY_AUDIO%,%KSNAME_GLOBAL.TOPO%,Audio.I.GLOBAL.TOPO
+AddInterface=%KSCATEGORY_TOPOLOGY%,%KSNAME_GLOBAL.TOPO%,Audio.I.GLOBAL.TOPO
+
+[Audio.I.SPEAKER.WAVE]
+AddReg=ELO71AIR.I.SPEAKER.WAVE.AddReg
+
+[Audio.I.SPDIFOUT.WAVE]
+AddReg=ELO71AIR.I.SPDIFOUT.WAVE.AddReg
+
+[Audio.I.HPOUT.WAVE]
+AddReg=ELO71AIR.I.HPOUT.WAVE.AddReg
+
+[Audio.I.RECIN.WAVE]
+AddReg=ELO71AIR.I.RECIN.WAVE.AddReg
+
+[Audio.I.MICIN.WAVE]
+AddReg=ELO71AIR.I.MICIN.WAVE.AddReg
+
+[Audio.I.LINEIN.WAVE]
+AddReg=ELO71AIR.I.LINEIN.WAVE.AddReg
+
+[Audio.I.SPDIFIN.WAVE]
+AddReg=ELO71AIR.I.SPDIFIN.WAVE.AddReg
+
+[Audio.I.GLOBAL.TOPO]
+AddReg=ELO71AIR.I.GLOBAL.TOPO.AddReg, SysFx.AddReg, ELO71AIR.EPProperties.AddReg
+
+;---------------------------------------------------------------
+;                A d d R e g
+;---------------------------------------------------------------
+[ELO71AIR.AddReg]
+HKR,,Driver,,ELO71AIR.sys
+HKR,,AssociatedFilters,,"wdmaud,redbook"
+HKR,Drivers,SubClasses,,"wave,midi,mixer"
+HKR,Drivers\wave\wdmaud.drv, Driver,,wdmaud.drv
+HKR,Drivers\midi\wdmaud.drv, Driver,,wdmaud.drv
+HKR,Drivers\mixer\wdmaud.drv,Driver,,wdmaud.drv
+HKR,Drivers\wave\wdmaud.drv,Description,,%ELO71AIR.Audio.DeviceDesc%
+HKR,Drivers\midi\wdmaud.drv,Description,,%ELO71AIR.Audio.DeviceDesc%
+HKR,Drivers\mixer\wdmaud.drv,Description,,%ELO71AIR.Audio.DeviceDesc%
+
+[ELO71AIR_NAMES.AddReg]
+HKLM,%MediaCategories%\%ELO71AIRGUID.SpdifOut%,Name,,%ELO71AIRNode.SpdifOut%
+HKLM,%MediaCategories%\%ELO71AIRGUID.SpdifOut%,Display,1,00,00,00,00
+HKLM,%MediaCategories%\%ELO71AIRGUID.SpdifIn%,Name,,%ELO71AIRNode.SpdifIn%
+HKLM,%MediaCategories%\%ELO71AIRGUID.SpdifIn%,Display,1,00,00,00,00
+
+HKLM,%MediaCategories%\%HDAGuidStereoMixPin%,Name,,%HDAStereoMixPinName%
+HKLM,%MediaCategories%\%HDAGuidStereoMixPin%,Display,1,00,00,00,00
+HKLM,%MediaCategories%\%HDAGuidAuxInPin%,Name,,%HDAAuxInPinName%
+HKLM,%MediaCategories%\%HDAGuidAuxInPin%,Display,1,00,00,00,00
+
+HKLM,%MediaCategories%\%ELO71AIRGUID.XearSurHP%,Name,,%ELO71AIRNode.XearSurHP%
+HKLM,%MediaCategories%\%ELO71AIRGUID.XearSurHP%,Display,1,00,00,00,00
+
+
+[ELO71AIR.I.SPEAKER.WAVE.AddReg]
+HKR,,CLSID,,%Proxy.CLSID%
+HKR,,FriendlyName,,%ELO71AIR.SPEAKER.WAVE.szPname%
+
+[ELO71AIR.I.SPDIFOUT.WAVE.AddReg]
+HKR,,CLSID,,%Proxy.CLSID%
+HKR,,FriendlyName,,%ELO71AIR.SPDIFOUT.WAVE.szPname%
+
+[ELO71AIR.I.HPOUT.WAVE.AddReg]
+HKR,,CLSID,,%Proxy.CLSID%
+HKR,,FriendlyName,,%ELO71AIR.HPOUT.WAVE.szPname%
+
+[ELO71AIR.I.RECIN.WAVE.AddReg]
+HKR,,CLSID,,%Proxy.CLSID%
+HKR,,FriendlyName,,%ELO71AIR.RECIN.WAVE.szPname%
+
+[ELO71AIR.I.MICIN.WAVE.AddReg]
+HKR,,CLSID,,%Proxy.CLSID%
+HKR,,FriendlyName,,%ELO71AIR.MICIN.WAVE.szPname%
+
+[ELO71AIR.I.LINEIN.WAVE.AddReg]
+HKR,,CLSID,,%Proxy.CLSID%
+HKR,,FriendlyName,,%ELO71AIR.LINEIN.WAVE.szPname%
+
+[ELO71AIR.I.SPDIFIN.WAVE.AddReg]
+HKR,,CLSID,,%Proxy.CLSID%
+HKR,,FriendlyName,,%ELO71AIR.SPDIFIN.WAVE.szPname%
+
+[ELO71AIR.I.GLOBAL.TOPO.AddReg]
+HKR,,CLSID,,%Proxy.CLSID%
+HKR,,FriendlyName,,%ELO71AIR.GLOBAL.TOPO.szPname%
+
+[ELO71AIR.EPProperties.AddReg]
+HKR,"EP\\0",%PKEY_AudioEndpoint_Association%,,%KSNODETYPE_ANY%
+HKR,"EP\\0",%PKEY_AudioEndpoint_Supports_EventDriven_Mode%,0x00010001,0x1
+
+[SysFx.AddReg]
+HKR,"FX\\0",%PKEY_ItemNameDisplay%,,%SYSFX_FriendlyName%
+HKR,"FX\\0",%PKEY_FX_UiClsid%,,%SYSFX_UI_CLSID%
+HKR,"FX\\0",%PKEY_FX_PreMixClsid%,,%SYSFX_PREMIX_CLSID%
+HKR,"FX\\0",%PKEY_FX_PostMixClsid%,,%SYSFX_POSTMIX_CLSID%
+HKR,"FX\\0",%PKEY_FX_Association%,,%KSNODETYPE_SPEAKER%
+
+HKR,"FX\\1",%PKEY_ItemNameDisplay%,,%SYSFX_FriendlyName%
+HKR,"FX\\1",%PKEY_FX_UiClsid%,,%SYSFX_UI_CLSID%
+HKR,"FX\\1",%PKEY_FX_PreMixClsid%,,%SYSFX_PREMIX_CLSID%
+HKR,"FX\\1",%PKEY_FX_PostMixClsid%,,%SYSFX_POSTMIX_CLSID%
+HKR,"FX\\1",%PKEY_FX_Association%,,%KSNODETYPE_HEADPHONES%
+
+HKR,"FX\\2",%PKEY_ItemNameDisplay%,,%SYSFX_FriendlyName%
+HKR,"FX\\2",%PKEY_FX_UiClsid%,,%SYSFX_UI_CLSID%
+HKR,"FX\\2",%PKEY_FX_PreMixClsid%,,%SYSFX_PREMIX_CLSID%
+HKR,"FX\\2",%PKEY_FX_PostMixClsid%,,%SYSFX_POSTMIX_CLSID%
+HKR,"FX\\2",%PKEY_FX_Association%,,%KSNODETYPE_SPDIF_INTERFACE%
+
+HKR,"FX\\3",%PKEY_ItemNameDisplay%,,%SYSFX_FriendlyName%
+HKR,"FX\\3",%PKEY_FX_UiClsid%,,%SYSFX_UI_CLSID%
+HKR,"FX\\3",%PKEY_FX_PreMixClsid%,,%SYSFX_PREMIX_CLSID%
+HKR,"FX\\3",%PKEY_FX_Association%,,%KSNODETYPE_MICROPHONE%
+
+HKR,"FX\\4",%PKEY_ItemNameDisplay%,,%SYSFX_FriendlyName%
+HKR,"FX\\4",%PKEY_FX_UiClsid%,,%SYSFX_UI_CLSID%
+HKR,"FX\\4",%PKEY_FX_PreMixClsid%,,%SYSFX_PREMIX_CLSID%
+HKR,"FX\\4",%PKEY_FX_Association%,,%KSNODETYPE_DESKTOP_MICROPHONE%
+
+[SfxFx.AddReg]
+HKCR,CLSID\%SYSFX_POSTMIX_CLSID%,,,"CMEffect Class (Global)"
+HKCR,CLSID\%SYSFX_POSTMIX_CLSID%\InProcServer32,,0x00020000,%%SystemRoot%%\System32\CMEFFECTAPO_ELO71AIR.dll
+HKCR,CLSID\%SYSFX_POSTMIX_CLSID%\InProcServer32,ThreadingModel,,"Both"
+
+HKCR,CLSID\%SYSFX_PREMIX_CLSID%,,,"CMEffect Class (Local)"
+HKCR,CLSID\%SYSFX_PREMIX_CLSID%\InProcServer32,,0x00020000,%%SystemRoot%%\System32\CMEFFECTAPO_ELO71AIR.dll
+HKCR,CLSID\%SYSFX_PREMIX_CLSID%\InProcServer32,ThreadingModel,,"Both"
+
+HKCR,CLSID\%SYSFX_UI_CLSID%,,,"CMEffect PropPageExt Class"
+HKCR,CLSID\%SYSFX_UI_CLSID%\InProcServer32,,0x00020000,%%SystemRoot%%\System32\CMCPLEXT_ELO71AIR.dll
+HKCR,CLSID\%SYSFX_UI_CLSID%\InProcServer32,ThreadingModel,,"Apartment"
+
+HKCR,AudioEngine\AudioProcessingObjects\%SYSFX_POSTMIX_CLSID%, "FriendlyName", ,"Global CMEffect Class"
+HKCR,AudioEngine\AudioProcessingObjects\%SYSFX_POSTMIX_CLSID%, "Copyright", ,"Copyright (c) C-Media Electronics Inc. All Rights Reserved"
+HKCR,AudioEngine\AudioProcessingObjects\%SYSFX_POSTMIX_CLSID%, "MajorVersion", %REG_DWORD%, 1
+HKCR,AudioEngine\AudioProcessingObjects\%SYSFX_POSTMIX_CLSID%, "MinorVersion", %REG_DWORD%, 1
+HKCR,AudioEngine\AudioProcessingObjects\%SYSFX_POSTMIX_CLSID%, "Flags", %REG_DWORD%, 0x00000004
+HKCR,AudioEngine\AudioProcessingObjects\%SYSFX_POSTMIX_CLSID%, "MinInputConnections", %REG_DWORD%, 1
+HKCR,AudioEngine\AudioProcessingObjects\%SYSFX_POSTMIX_CLSID%, "MaxInputConnections", %REG_DWORD%, 1
+HKCR,AudioEngine\AudioProcessingObjects\%SYSFX_POSTMIX_CLSID%, "MinOutputConnections", %REG_DWORD%, 1
+HKCR,AudioEngine\AudioProcessingObjects\%SYSFX_POSTMIX_CLSID%, "MaxOutputConnections", %REG_DWORD%, 1
+HKCR,AudioEngine\AudioProcessingObjects\%SYSFX_POSTMIX_CLSID%, "MaxInstances", %REG_DWORD%, 0xffffffff
+HKCR,AudioEngine\AudioProcessingObjects\%SYSFX_POSTMIX_CLSID%, "NumAPOInterfaces", %REG_DWORD%, 1
+HKCR,AudioEngine\AudioProcessingObjects\%SYSFX_POSTMIX_CLSID%, "APOInterface0", ,"{FD7F2B29-24D0-4B5C-B177-592C39F9CA10}"
+
+HKCR,AudioEngine\AudioProcessingObjects\%SYSFX_PREMIX_CLSID%, "FriendlyName", ,"Local CMEffect Class"
+HKCR,AudioEngine\AudioProcessingObjects\%SYSFX_PREMIX_CLSID%, "Copyright", ,"Copyright (c) C-Media Electronics Inc. All Rights Reserved"
+HKCR,AudioEngine\AudioProcessingObjects\%SYSFX_PREMIX_CLSID%, "MajorVersion", %REG_DWORD%, 1
+HKCR,AudioEngine\AudioProcessingObjects\%SYSFX_PREMIX_CLSID%, "MinorVersion", %REG_DWORD%, 1
+HKCR,AudioEngine\AudioProcessingObjects\%SYSFX_PREMIX_CLSID%, "Flags", %REG_DWORD%, 0x0000000c
+HKCR,AudioEngine\AudioProcessingObjects\%SYSFX_PREMIX_CLSID%, "MinInputConnections", %REG_DWORD%, 1
+HKCR,AudioEngine\AudioProcessingObjects\%SYSFX_PREMIX_CLSID%, "MaxInputConnections", %REG_DWORD%, 1
+HKCR,AudioEngine\AudioProcessingObjects\%SYSFX_PREMIX_CLSID%, "MinOutputConnections", %REG_DWORD%, 1
+HKCR,AudioEngine\AudioProcessingObjects\%SYSFX_PREMIX_CLSID%, "MaxOutputConnections", %REG_DWORD%, 1
+HKCR,AudioEngine\AudioProcessingObjects\%SYSFX_PREMIX_CLSID%, "MaxInstances", %REG_DWORD%, 0xffffffff
+HKCR,AudioEngine\AudioProcessingObjects\%SYSFX_PREMIX_CLSID%, "NumAPOInterfaces", %REG_DWORD%, 1
+HKCR,AudioEngine\AudioProcessingObjects\%SYSFX_PREMIX_CLSID%, "APOInterface0", ,"{FD7F2B29-24D0-4B5C-B177-592C39F9CA10}"
+
+
+;---------------------------------------------------------------
+;                D e l R e g
+;---------------------------------------------------------------
+
+[ELO71AIR.DelReg]
+HKR,Settings
+
+;---------------------------------------------------------------
+;                S e r v i c e s  
+;---------------------------------------------------------------
+
+[ELO71AIR.Services]
+AddService=ELO71AIR, 0x00000002, ELO71AIR.ServiceInstall
+
+[ELO71AIR.NTamd64.Services]
+AddService=ELO71AIR, 0x00000002, ELO71AIR.ServiceInstall
+
+[ELO71AIR.ServiceInstall]
+DisplayName=%ELO71AIR.SvcDesc%
+ServiceType=%SERVICE_KERNEL_DRIVER%
+StartType=%SERVICE_DEMAND_START%
+ErrorControl=%SERVICE_ERROR_NORMAL%
+ServiceBinary=%12%\ELO71AIR.sys
+
+;---------------------------------------------------------------
+;                Copy Files
+;---------------------------------------------------------------
+
+[ELO71AIR.CopyFiles]
+ELO71AIR.SYS
+
+[CMEFFECTAPO_ELO71AIR.CopyFiles]
+CMEFFECTAPO_ELO71AIR.dll
+CMCPLEXT_ELO71AIR.dll
+
+;---------------------------------------------------------------
+;                S t r i n g s
+;---------------------------------------------------------------
+
+[Strings]
+; non-localizeable
+Proxy.CLSID="{17CCA71B-ECD7-11D0-B908-00A0C9223196}"
+KSCATEGORY_RENDER="{65E8773E-8F56-11D0-A3B9-00A0C9223196}"
+KSCATEGORY_CAPTURE="{65E8773D-8F56-11D0-A3B9-00A0C9223196}"
+KSCATEGORY_AUDIO="{6994AD04-93EF-11D0-A3CC-00A0C9223196}"
+KSCATEGORY_TOPOLOGY = "{DDA54A40-1E4C-11D1-A050-405705C10000}" ; non-localizable
+KSCATEGORY_REALTIME = "{EB115FFC-10C8-4964-831D-6DCB02E6F23F}" ; non-localizable
+
+KSNAME_SPEAKER.WAVE="SPKOut00Wave"
+KSNAME_SPDIFOUT.WAVE="SPDIFOut00Wave"
+KSNAME_HPOUT.WAVE="HPOut00Wave"
+KSNAME_RECIN.WAVE="RecIn00Wave"
+KSNAME_MICIN.WAVE="MicIn00Wave"
+KSNAME_LINEIN.WAVE="LineIn00Wave"
+KSNAME_SPDIFIN.WAVE="SPDIFIn00Wave"
+KSNAME_GLOBAL.TOPO="GlobalTopo"
+
+SERVICE_KERNEL_DRIVER=1
+SERVICE_DEMAND_START=3
+SERVICE_ERROR_NORMAL=1
+REG_DWORD=0x00010001
+
+MediaCategories="SYSTEM\CurrentControlSet\Control\MediaCategories"
+
+;localizeable
+ELO71AIRGUID.SpdifOut="{12C15946-BA58-42c1-9F11-8341E2198622}"
+ELO71AIRGUID.SpdifIn	="{017D895C-7AE7-4f4d-B78C-CD1FFC0CE776}"
+HDAGuidStereoMixPin 		="{8c5716e6-c984-492e-a2fb-1385f2d0f3c9}"
+HDAGuidAuxInPin 		="{5f4bb488-a646-408a-9265-8647f9c374d4}"
+ELO71AIRGUID.XearSurHP	="{c7600b33-1aa6-4383-918d-30d848bbad3e}"
+
+CMEDIA="C-MEDIA Inc."
+ManufacturerString="Turtle Beach"
+ELO71AIR.DeviceDesc="ELO 7.1 AIR"
+ELO71AIR.SvcDesc="ELO71AIR"
+ELO71AIR.SPEAKER.WAVE.szPname="Speaker"
+ELO71AIR.SPDIFOUT.WAVE.szPname="SpdifOut"
+ELO71AIR.HPOUT.WAVE.szPname="Headphone"
+ELO71AIR.RECIN.WAVE.szPname="Capture"
+ELO71AIR.MICIN.WAVE.szPname="MicIn"
+ELO71AIR.LINEIN.WAVE.szPname="LineIn"
+ELO71AIR.SPDIFIN.WAVE.szPname="SpdifIn"
+ELO71AIR.GLOBAL.TOPO.szPname="Global Mixer"
+ELO71AIR.Audio.DeviceDesc="ELO 7.1 AIR Audio"
+cdname="Turtle Beach ELO 7.1 AIR Installation Disk"
+ELO71AIRNode.SpdifOut="SPDIF Out"
+ELO71AIRNode.SpdifIn="SPDIF In"
+HDAStereoMixPinName="Stereo Mix"
+HDAAuxInPinName="Aux In"
+ELO71AIRNode.XearSurHP="Xear Surround Headphone"
+
+;; These are the name strings for the wave miniports displayed in mmsys.cpl
+;;
+
+KSNODETYPE_ANY                    = "{00000000-0000-0000-0000-000000000000}"
+KSNODETYPE_SPEAKER                = "{DFF21CE1-F70F-11D0-B917-00A0C9223196}"
+KSNODETYPE_LINE_CONNECTOR 	  = "{DFF21FE3-F70F-11D0-B917-00A0C9223196}"
+KSNODETYPE_HEADSET_SPEAKERS       = "{DFF21CE6-F70F-11D0-B917-00A0C9223196}"
+KSNODETYPE_HEADPHONES             = "{DFF21CE2-F70F-11D0-B917-00A0C9223196}"
+KSNODETYPE_DESKTOP_SPEAKER        = "{DFF21CE4-F70F-11D0-B917-00A0C9223196}"
+KSNODETYPE_SPDIF_INTERFACE        = "{DFF21FE5-F70F-11D0-B917-00A0C9223196}"
+KSNODETYPE_MICROPHONE 			  = "{DFF21BE1-F70F-11D0-B917-00A0C9223196}"
+KSNODETYPE_DESKTOP_MICROPHONE     = "{DFF21BE2-F70F-11D0-B917-00A0C9223196}"
+;;
+;; PropertyKey GUIDS
+;;
+
+PKEY_FX_Association          = "{D04E05A6-594B-4FB6-A80D-01AF5EED7D1D},0"
+PKEY_FX_PreMixClsid          = "{D04E05A6-594B-4FB6-A80D-01AF5EED7D1D},1"
+PKEY_FX_PostMixClsid         = "{D04E05A6-594B-4FB6-A80D-01AF5EED7D1D},2"
+PKEY_FX_UiClsid              = "{D04E05A6-594B-4FB6-A80D-01AF5EED7D1D},3"
+PKEY_ItemNameDisplay         = "{B725F130-47EF-101A-A5F1-02608C9EEBAC},10"
+
+PKEY_AudioEndpoint_ControlPanelPageProvider = "{1DA5D803-D492-4EDD-8C23-E0C0FFEE7F0E},1"
+PKEY_AudioEndpoint_Association  = "{1DA5D803-D492-4EDD-8C23-E0C0FFEE7F0E},2"
+PKEY_AudioEndpoint_Supports_EventDriven_Mode = "{1DA5D803-D492-4EDD-8C23-E0C0FFEE7F0E},7"
+	
+PKEY_AudioEngine_OEMFormat = "{E4870E26-3CC5-4CD2-BA46-CA0A9A70ED04},3"
+
+AUDIOENDPOINT_EXT_UI_CLSID = "{6C57B2A2-91F5-4b90-93D5-FAB82485ECA6}"
+
+SYSFX_UI_CLSID      = "{6453AE5B-9048-4935-8CF2-8B235467EBDA}"
+SYSFX_PREMIX_CLSID  = "{D0894B1F-AFB1-480C-8335-88F56674BA28}"
+SYSFX_POSTMIX_CLSID = "{C0C97EA7-6367-4746-8521-CF7111F3D814}"
+SYSFX_FriendlyName  = "CMedia Audio System Effect"
+
+REG_BINARY          = 0x00000001
+
+
